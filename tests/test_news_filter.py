@@ -11,6 +11,17 @@ def test_symbols_for_country_us():
     assert "XAUUSD" in symbols_for_country("US")
 
 
+def test_calendar_enabled_string_false_means_off():
+    nf = NewsFilter({"calendar_enabled": "false"})
+    assert nf._calendar_enabled is False
+
+
+def test_fxbot_news_calendar_env_overrides_yaml(monkeypatch):
+    monkeypatch.setenv("FXBOT_NEWS_CALENDAR", "0")
+    nf = NewsFilter({"calendar_enabled": True})
+    assert nf._calendar_enabled is False
+
+
 @pytest.fixture
 def nf():
     return NewsFilter(

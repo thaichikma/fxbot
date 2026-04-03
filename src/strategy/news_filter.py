@@ -42,6 +42,32 @@ def symbols_for_country(country: str) -> list[str]:
     return COUNTRY_TO_SYMBOLS.get(key, COUNTRY_TO_SYMBOLS["US"])
 
 
+def _parse_bool_config(val: Any, default: bool = True) -> bool:
+    """YAML / env friendly: false, 'false', 0 all mean False (unlike bool('false') which is True)."""
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    s = str(val).strip().lower()
+    if s in ("0", "false", "no", "off", ""):
+        return False
+    if s in ("1", "true", "yes", "on"):
+        return True
+    return default
+
+
+def _calendar_enabled_from_env_and_cfg(news_cfg: dict[str, Any]) -> bool:
+    """FXBOT_NEWS_CALENDAR=0|1 overrides settings news.calendar_enabled."""
+    raw = (os.getenv("FXBOT_NEWS_CALENDAR") or "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return _parse_bool_config(news_cfg.get("calendar_enabled", True), True)
+
+
 def _parse_event_time(value: Any) -> datetime | None:
     if value is None:
         return None
@@ -77,13 +103,17 @@ class NewsFilter:
         self._critical_keywords = [k.upper() for k in raw_kw]
         impacts = cfg.get("impact_levels_block") or ["high"]
         self._impact_block = {str(x).lower() for x in impacts}
-        # Set false if Finnhub key has no calendar access (403) or you want news off without removing the key.
-        self._calendar_enabled = bool(cfg.get("calendar_enabled", True))
+        self._calendar_enabled = _calendar_enabled_from_env_and_cfg(cfg)
 
         self._token = os.getenv("FINNHUB_API_KEY", "")
         self._cached_events: list[dict[str, Any]] = []
         self._cache_fetched_at: datetime | None = None
         self._last_error: str | None = None
+
+        if not self._calendar_enabled:
+            logger.info(
+                "News economic calendar OFF (news.calendar_enabled or FXBOT_NEWS_CALENDAR=0) — skipping Finnhub HTTP",
+            )
 
     @property
     def last_error(self) -> str | None:

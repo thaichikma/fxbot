@@ -107,7 +107,7 @@ mt5:
 # Economic calendar (Finnhub) — free keys often return 403 on economic calendar; set calendar_enabled: false
 news:
   provider: finnhub
-  calendar_enabled: true          # false = skip Finnhub HTTP (no news blocking from calendar)
+  calendar_enabled: false         # true = call Finnhub calendar (needs API tier with access); false = no HTTP
   cache_ttl_minutes: 45
   block_before_high_minutes: 15
   block_after_high_minutes: 15
