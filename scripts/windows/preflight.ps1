@@ -38,17 +38,22 @@ if (Test-Path $envFile) {
 
 if ($env:OS -like "*Windows*") {
     if (Test-Path $venvPy) {
-        $code = @'
+        # Do not use python -c with a multiline string: PowerShell may corrupt quotes when passing args.
+        $tmp = Join-Path $env:TEMP ("fxbot_preflight_mt5_{0}.py" -f [guid]::NewGuid().ToString('N'))
+        $py = @'
 import sys
 try:
     import MetaTrader5 as mt5
-    print("[OK] import MetaTrader5")
+    print("OK: MetaTrader5 import")
 except Exception as ex:
-    print("[FAIL] MetaTrader5:", ex)
+    print("FAIL MetaTrader5:", ex)
     sys.exit(1)
 '@
-        & $venvPy -c $code
-        if ($LASTEXITCODE -ne 0) { $ok = $false }
+        Set-Content -LiteralPath $tmp -Value $py -Encoding UTF8
+        & $venvPy $tmp
+        $mt5Exit = $LASTEXITCODE
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        if ($mt5Exit -ne 0) { $ok = $false }
     }
 } else {
     Write-Host '[SKIP] Not Windows - MetaTrader5 Python package is Windows-only'
