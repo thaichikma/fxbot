@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Kiểm tra nhanh môi trường Windows trước khi chạy FXBot production.
+  Quick environment check before running FXBot on Windows (venv, .env, MetaTrader5).
 #>
 param(
     [Parameter(Mandatory = $false)]
@@ -17,7 +17,7 @@ if (-not $ProjectRoot) {
     $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 }
 
-Write-Host "=== FXBot preflight ===" 
+Write-Host "=== FXBot preflight ==="
 Write-Host "ProjectRoot: $ProjectRoot"
 
 $venvPy = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
@@ -25,36 +25,37 @@ if (Test-Path $venvPy) {
     Write-Host "[OK] venv: $venvPy"
     & $venvPy --version
 } else {
-    Write-Host "[FAIL] Chưa có .venv — python -m venv .venv && pip install -r requirements.txt"
+    Write-Host "[FAIL] No .venv — run: python -m venv .venv ; pip install -r requirements.txt"
     $ok = $false
 }
 
 $envFile = Join-Path $ProjectRoot ".env"
 if (Test-Path $envFile) {
-    Write-Host "[OK] .env tồn tại"
+    Write-Host "[OK] .env exists"
 } else {
-    Write-Host "[WARN] Chưa có .env — copy từ .env.example"
+    Write-Host "[WARN] No .env — copy from .env.example"
 }
 
 if ($env:OS -like "*Windows*") {
     if (Test-Path $venvPy) {
-        $code = @"
+        # Single-quoted here-string so PowerShell does not parse Python as script (PS 5.1 safe).
+        $code = @'
 import sys
 try:
     import MetaTrader5 as mt5
-    print('[OK] import MetaTrader5')
-except Exception as e:
-    print('[FAIL] MetaTrader5:', e)
+    print("[OK] import MetaTrader5")
+except Exception as ex:
+    print("[FAIL] MetaTrader5:", ex)
     sys.exit(1)
-"@
+'@
         & $venvPy -c $code
         if ($LASTEXITCODE -ne 0) { $ok = $false }
     }
 } else {
-    Write-Host "[SKIP] Không phải Windows — MT5 chỉ trên Windows"
+    Write-Host "[SKIP] Not Windows — MetaTrader5 Python package is Windows-only"
 }
 
 if (-not $ok) {
     exit 1
 }
-Write-Host "=== Xong ==="
+Write-Host "=== Done ==="

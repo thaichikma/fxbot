@@ -24,7 +24,7 @@ Set-Location $ProjectRoot
 
 $venvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $venvPython)) {
-    Write-Error "Không tìm thấy $venvPython — tạo venv: python -m venv .venv && pip install -r requirements.txt"
+    Write-Error "Missing $venvPython — create venv: python -m venv .venv ; pip install -r requirements.txt"
 }
 
 # UTF-8 log/console an toàn hơn với loguru/Unicode
