@@ -217,6 +217,15 @@ class MT5Client:
             spread_points=info.spread,
         )
 
+    def ensure_symbol_ready(self, symbol: str) -> bool:
+        """Thêm symbol vào Market Watch nếu cần (để copy_rates hoạt động)."""
+        if mt5 is None or not self._connected:
+            return False
+        ok = mt5.symbol_select(symbol, True)
+        if not ok:
+            logger.warning("MT5 symbol_select failed for {}", symbol)
+        return bool(ok)
+
     def get_rates(
         self,
         symbol: str,

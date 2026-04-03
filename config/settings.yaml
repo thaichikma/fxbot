@@ -129,6 +129,10 @@ backtest:
   initial_balance: 10000
   step_bars: 4
   min_m15_bars: 120
+  # Telegram /backtest <SYMBOL>: nếu CSV chưa có và MT5 đã kết nối → tự tải M15 rồi chạy backtest
+  auto_fetch_mt5: true
+  mt5_fetch_bars: 8000
+  auto_csv_pattern: "data/backtest/{symbol}_m15.csv"
   # Spread / commission / swap — mô hình xấp xỉ; chỉnh theo MT5 Symbol spec / FTMO (thay đổi theo thời điểm).
   # Nguồn tham chiếu công khai: FTMO forex ~$2.50/lot/một chiều (~$5 RT/lot); swap EURUSD bậc ~vài USD/đêm/lot (broker-specific).
   # Vàng/CFD: FTMO dùng % notional — không khớp hoàn toàn với commission cố định/lot; giảm commission hoặc tắt nếu backtest XAU.

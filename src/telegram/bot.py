@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from loguru import logger
 
+from backtest.mt5_fetch import fetch_m15_to_csv, looks_like_csv_path
 from backtest.run import run_backtest_report
 
 # Telegram message limit; split long backtest output
@@ -29,11 +30,33 @@ Cách dùng nhanh:
 • /bt — giống /backtest
 • /backtest help — bản hướng dẫn này
 • /backtest status — xem symbol + đường dẫn CSV mặc định + có file hay không
+• /backtest XAUUSD — chỉ symbol: dùng pattern auto_csv_pattern (mặc định data/backtest/{symbol}_m15.csv); nếu chưa có file và MT5 đã kết nối → tự tải M15 rồi chạy
 • /backtest data/backtest/my.csv — 1 đối số = đường dẫn CSV (symbol = default_symbol)
 • /backtest XAUUSD data/backtest/xau.csv — symbol + đường dẫn
 
-File CSV phải có thật trên máy chạy bot (copy vào repo, ví dụ data/backtest/xau.csv).
-Repo có sẵn: data/backtest/sample_m15.csv. Đường dẫn tương đối từ thư mục gốc (có config/). Dùng / hoặc \\ trên Windows."""
+Nếu bật backtest.auto_fetch_mt5 và terminal MT5 đã kết nối, bot sẽ tự tải nến thiếu trước khi backtest.
+Nếu không dùng MT5, copy CSV vào repo (ví dụ data/backtest/xau.csv). Có sẵn: data/backtest/sample_m15.csv.
+Đường dẫn tương đối từ thư mục gốc project. Dùng / hoặc \\ trên Windows."""
+
+
+def _resolve_csv_path(root: Path, csv_arg: str) -> Path:
+    p = Path(csv_arg)
+    if p.is_absolute():
+        return p.resolve()
+    return (root / csv_arg).resolve()
+
+
+def _yaml_bool(val: Any, default: bool = True) -> bool:
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    s = str(val).strip().lower()
+    if s in ("0", "false", "no", "off"):
+        return False
+    if s in ("1", "true", "yes", "on"):
+        return True
+    return default
 
 try:
     from telegram import Update
@@ -430,6 +453,9 @@ class TelegramBot:
         min_bars = int(bt.get("min_m15_bars", 120))
         csv_default = str(bt.get("default_csv", "") or "").strip()
         default_path = (root / csv_default).resolve() if csv_default else None
+        auto_fetch = _yaml_bool(bt.get("auto_fetch_mt5"), True)
+        fetch_bars = int(bt.get("mt5_fetch_bars", 8000))
+        auto_pattern = str(bt.get("auto_csv_pattern", "data/backtest/{symbol}_m15.csv"))
 
         raw_args = context.args or []
         args = [a.strip() for a in raw_args if a.strip()]
@@ -442,12 +468,15 @@ class TelegramBot:
             if sub == "status":
                 exists = default_path.is_file() if default_path else False
                 line_path = str(default_path) if default_path else "(chưa set default_csv)"
+                mt5_ok = bool(self.mt5_client and getattr(self.mt5_client, "connected", False))
                 await update.message.reply_text(
                     "📊 Backtest (config)\n"
                     f"• default_symbol: {default_symbol}\n"
                     f"• default_csv: {csv_default or '(trống)'}\n"
                     f"• file tồn tại: {'có' if exists else 'không'}\n"
                     f"• đường dẫn đầy đủ:\n{line_path}\n"
+                    f"• auto_fetch_mt5: {'bật' if auto_fetch else 'tắt'} | MT5 kết nối: {'có' if mt5_ok else 'không'}\n"
+                    f"• mt5_fetch_bars / auto_csv_pattern: {fetch_bars} / {auto_pattern}\n"
                     f"• balance/step/min_bars: {default_balance} / {step} / {min_bars}",
                 )
                 return
@@ -461,15 +490,68 @@ class TelegramBot:
             symbol = default_symbol
             csv_arg = csv_default
         elif len(args) == 1:
-            symbol = default_symbol
-            csv_arg = args[0]
+            if looks_like_csv_path(args[0]):
+                symbol = default_symbol
+                csv_arg = args[0]
+            else:
+                symbol = args[0].upper()
+                csv_arg = auto_pattern.format(symbol=symbol)
         else:
             symbol = args[0].upper()
             csv_arg = " ".join(args[1:])
 
+        csv_path = _resolve_csv_path(root, csv_arg)
+
         status = await update.message.reply_text("⏳ Đang chạy backtest...")
 
         loop = asyncio.get_running_loop()
+        mt5_connected = bool(self.mt5_client and getattr(self.mt5_client, "connected", False))
+
+        if not csv_path.is_file():
+            if auto_fetch and mt5_connected:
+                try:
+                    await status.edit_text(f"⏳ Tải M15 từ MT5: {symbol} → {csv_arg}...")
+                except Exception:
+                    pass
+                try:
+                    n = await loop.run_in_executor(
+                        None,
+                        functools.partial(
+                            fetch_m15_to_csv,
+                            self.mt5_client,
+                            symbol,
+                            csv_path,
+                            fetch_bars,
+                        ),
+                    )
+                    try:
+                        await status.edit_text(f"⏳ Đã tải {n} nến. Chạy backtest...")
+                    except Exception:
+                        pass
+                except Exception as e:
+                    logger.exception("MT5 fetch for backtest failed")
+                    try:
+                        await status.delete()
+                    except Exception:
+                        pass
+                    await update.message.reply_text(
+                        "Không tải được dữ liệu MT5:\n"
+                        f"{escape(str(e))[:3500]}\n\n/backtest help",
+                    )
+                    return
+            elif auto_fetch and not mt5_connected:
+                try:
+                    await status.delete()
+                except Exception:
+                    pass
+                await update.message.reply_text(
+                    "Thiếu file CSV và MT5 chưa kết nối.\n"
+                    "• Bật terminal MT5 (hoặc mock dev) rồi thử lại để tự tải M15\n"
+                    "• Hoặc đặt file thủ công vào đường dẫn đã chọn\n\n"
+                    f"Đường dẫn mong đợi:\n{csv_path}\n\n/backtest help",
+                )
+                return
+
         try:
             text = await loop.run_in_executor(
                 None,

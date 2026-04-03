@@ -111,6 +111,10 @@ class MT5Mock:
             name="Mock Trader",
         )
 
+    def ensure_symbol_ready(self, symbol: str) -> bool:
+        """Mock: luôn OK để tải dữ liệu giả lập."""
+        return True
+
     def get_symbol_info(self, symbol: str) -> SymbolInfo | None:
         self._count_request()
         configs = {
