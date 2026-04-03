@@ -18,7 +18,7 @@ from backtest.reporter import BacktestReporter
 
 def _load_yaml(project_root: Path, name: str) -> dict:
     p = project_root / "config" / name
-    with open(p) as f:
+    with open(p, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

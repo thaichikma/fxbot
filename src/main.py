@@ -36,20 +36,20 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def load_config(path: str = "config/settings.yaml") -> dict:
     """Load settings YAML config."""
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def load_ftmo_rules(path: str = "config/ftmo_rules.yaml") -> dict:
     """Load FTMO rules YAML config."""
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def load_symbols(path: Path | None = None) -> dict:
     """Load symbol specs (pip size, contract) for SMC / risk."""
     p = path or ROOT / "config" / "symbols.yaml"
-    with open(p, "r") as f:
+    with open(p, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
