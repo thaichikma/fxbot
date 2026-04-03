@@ -35,4 +35,4 @@ Chạy trên **Windows VPS** với MT5 Terminal và biến môi trường trong 
 - `/backtest help` — hướng dẫn; `/backtest status` — kiểm tra symbol và file mặc định.
 
 ## Backtest — phí giao dịch (xấp xỉ)
-- Trong `config/settings.yaml`, mục `backtest.costs`: spread (theo `symbols.yaml`), commission/lot, swap qua đêm — **không** thay thế tick thật hay 100% khớp FTMO; chỉnh `commission_*` / `swap_*` theo spec broker.
+- `backtest.costs`: spread (`symbols.yaml`), commission RT/lot (mặc định ~**$5**/lot forex theo thông tin FTMO kiểu ECN), swap đêm (mặc định long/short âm vài USD/lot — **ước lượng**). **Không** thay tick thật; vàng/CFD cần chỉnh tay (FTMO có thể tính %).

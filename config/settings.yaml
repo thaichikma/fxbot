@@ -129,13 +129,15 @@ backtest:
   initial_balance: 10000
   step_bars: 4
   min_m15_bars: 120
-  # Spread / commission / swap (approximate — not tick-level; tune vs your FTMO symbol spec)
+  # Spread / commission / swap — mô hình xấp xỉ; chỉnh theo MT5 Symbol spec / FTMO (thay đổi theo thời điểm).
+  # Nguồn tham chiếu công khai: FTMO forex ~$2.50/lot/một chiều (~$5 RT/lot); swap EURUSD bậc ~vài USD/đêm/lot (broker-specific).
+  # Vàng/CFD: FTMO dùng % notional — không khớp hoàn toàn với commission cố định/lot; giảm commission hoặc tắt nếu backtest XAU.
   costs:
     enabled: true
     spread_mode: typical          # typical = symbols.yaml typical_spread_points | max_pair | none
-    commission_usd_per_lot_round_turn: 0.0   # e.g. 6–7 USD/lot RT forex; 0 = off
-    swap_long_usd_per_lot_per_night: 0.0
-    swap_short_usd_per_lot_per_night: 0.0
+    commission_usd_per_lot_round_turn: 5.0    # forex-style RT/lot (≈ FTMO $2.50/side/lot; verify)
+    swap_long_usd_per_lot_per_night: -5.5     # ước lượng carry qua đêm (long); xác nhận trên MT5
+    swap_short_usd_per_lot_per_night: -2.0    # ước lượng (short); có thể âm hoặc nhỏ hơn long
 
 # System
 system:
