@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+from html import escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -125,6 +126,12 @@ class TelegramBot:
         ]
         for handler in handlers:
             self._app.add_handler(handler)
+        self._app.add_error_handler(self._on_error)
+
+    async def _on_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Log handler exceptions (avoids silent 'No error handlers are registered')."""
+        err = context.error
+        logger.exception("Telegram handler error: {}", err)
 
     # ─── Command Handlers ─────────────────────────────────────
 
@@ -329,25 +336,31 @@ class TelegramBot:
         name = self.session_filter.classify_session(now)
         auto = self.session_filter.auto_trade_allowed(now)
         q = self.session_filter.session_quality(now)
+        # HTML: Markdown breaks on underscores in e.g. auto_trade_allowed
         await update.message.reply_text(
-            f"Session: `{name}`\nauto_trade_allowed: `{auto}`\nquality: `{q:.2f}`\n(UTC now)",
-            parse_mode="Markdown",
+            f"Session: <code>{escape(str(name))}</code>\n"
+            f"auto_trade_allowed: <code>{auto}</code>\n"
+            f"quality: <code>{q:.2f}</code>\n"
+            "(UTC now)",
+            parse_mode="HTML",
         )
 
     async def _cmd_config(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show key runtime flags."""
         sys_ = self.settings.get("system", {})
-        msg = (
-            f"*Runtime*\n"
-            f"auto_mode (YAML): `{sys_.get('auto_mode')}`\n"
-            f"execution (YAML): `{sys_.get('execution_enabled')}`\n"
-        )
+        lines = [
+            "<b>Runtime</b>",
+            f"auto_mode (YAML): <code>{escape(str(sys_.get('auto_mode')))}</code>",
+            f"execution (YAML): <code>{escape(str(sys_.get('execution_enabled')))}</code>",
+        ]
         if self.trading_state:
-            msg += (
-                f"state.auto: `{self.trading_state.auto_mode}`\n"
-                f"state.exec: `{self.trading_state.execution_enabled}`\n"
+            lines.extend(
+                [
+                    f"state.auto: <code>{escape(str(self.trading_state.auto_mode))}</code>",
+                    f"state.exec: <code>{escape(str(self.trading_state.execution_enabled))}</code>",
+                ]
             )
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
     async def _cmd_challenge(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Challenge progress summary."""
