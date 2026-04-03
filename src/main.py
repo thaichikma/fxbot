@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -16,13 +17,21 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from src.utils.logger import setup_logger
+from src.core.order_manager import OrderManager
+from src.core.trading_state import TradingState
 from src.data.db import Database
-from src.data.models import AccountInfo
 from src.risk.daily_tracker import DailyTracker
 from src.risk.ftmo_guardian import FTMOGuardian, GuardianConfig
+from src.risk.risk_manager import RiskManager
+from src.strategy.news_filter import NewsFilter
+from src.strategy.scanner import SignalScanner
+from src.strategy.session_filter import SessionFilter
+from src.strategy.smc_engine import SMCEngine
 
 # Detect platform for MT5 client
 IS_WINDOWS = sys.platform == "win32"
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_config(path: str = "config/settings.yaml") -> dict:
@@ -34,6 +43,13 @@ def load_config(path: str = "config/settings.yaml") -> dict:
 def load_ftmo_rules(path: str = "config/ftmo_rules.yaml") -> dict:
     """Load FTMO rules YAML config."""
     with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def load_symbols(path: Path | None = None) -> dict:
+    """Load symbol specs (pip size, contract) for SMC / risk."""
+    p = path or ROOT / "config" / "symbols.yaml"
+    with open(p, "r") as f:
         return yaml.safe_load(f)
 
 
@@ -71,6 +87,8 @@ async def main():
     # Load configs
     settings = load_config()
     ftmo_rules = load_ftmo_rules()
+    symbols_yaml = load_symbols()
+    symbols_specs = symbols_yaml.get("symbols", {})
 
     # Setup logging
     system_cfg = settings.get("system", {})
@@ -129,6 +147,33 @@ async def main():
         initial_balance=initial_balance,
     )
 
+    # Phase 2 — strategy stack (scan + notify only; no orders)
+    strategy_merged = dict(settings.get("strategy", {}))
+    strategy_merged["max_signals_per_scan_per_symbol"] = system_cfg.get(
+        "max_signals_per_scan_per_symbol", 2
+    )
+    session_filter = SessionFilter(settings.get("sessions", {}))
+    news_filter = NewsFilter(settings.get("news", {}))
+    smc_engine = SMCEngine(strategy_merged, symbols_specs)
+    signal_scanner = SignalScanner(
+        settings,
+        symbols_specs,
+        session_filter,
+        news_filter,
+        smc_engine,
+    )
+
+    trading_state = TradingState.from_settings(system_cfg)
+    risk_manager = RiskManager(settings, symbols_specs, symbols_yaml)
+    order_manager = OrderManager(
+        mt5_client,
+        guardian,
+        risk_manager,
+        db,
+        daily_tracker,
+        settings,
+    )
+
     # Initialize Telegram bot
     telegram_cfg = settings.get("telegram", {})
     if telegram_cfg.get("enabled", True):
@@ -139,6 +184,12 @@ async def main():
             guardian=guardian,
             tracker=daily_tracker,
             mt5_client=mt5_client,
+            trading_state=trading_state,
+            order_manager=order_manager,
+            session_filter=session_filter,
+            news_filter=news_filter,
+            settings=settings,
+            project_root=ROOT,
         )
         await telegram.start()
         await telegram.send_message("🚀 *FXBot Started*\nSystem online and ready.")
@@ -155,6 +206,9 @@ async def main():
                 # 1. Update account info
                 account = mt5_client.get_account_info()
                 daily_tracker.update_equity(account.equity)
+                daily_tracker.sync_requests(getattr(mt5_client, "request_count", 0))
+
+                now = datetime.now(timezone.utc)
 
                 # 2. Monitor equity (FTMO Guardian)
                 safe, emergency_msg = guardian.monitor_equity(account.equity)
@@ -170,8 +224,29 @@ async def main():
                     daily_tracker.update_balance(account.balance)
                     logger.info("Daily reset | new starting balance={}", account.balance)
 
-                # 4. TODO (Phase 2): Signal scanning
-                # 5. TODO (Phase 3): Trade execution & management
+                # 4. Manage open trades (partial TP / breakeven)
+                await order_manager.manage_open_trades()
+
+                # 5. Signal scan + hybrid execution
+                if system_cfg.get("signal_scan_enabled", True):
+                    signals = await signal_scanner.scan(mt5_client, db)
+                    default_risk = float(settings.get("risk", {}).get("risk_per_trade", 0.01))
+                    risk_pct = trading_state.effective_risk_pct(default_risk)
+
+                    exec_ok = (
+                        trading_state.execution_enabled
+                        and trading_state.auto_mode
+                        and session_filter.auto_trade_allowed(now)
+                        and not guardian.kill_switch_active
+                    )
+
+                    for sig in signals:
+                        if exec_ok:
+                            trade = await order_manager.execute_signal(sig, risk_pct)
+                            if trade and telegram:
+                                await telegram.notify_trade_opened(trade)
+                        elif telegram:
+                            await telegram.notify_signal(sig.model_dump(mode="json"))
 
                 # Save daily snapshot to DB
                 snapshot = daily_tracker._get_today_snapshot()

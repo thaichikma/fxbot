@@ -104,10 +104,39 @@ mt5:
   deviation: 20                   # Max slippage in points
   filling_type: "ioc"             # ioc | fok | return
 
+# Economic calendar (Finnhub)
+news:
+  provider: finnhub
+  cache_ttl_minutes: 45
+  block_before_high_minutes: 15
+  block_after_high_minutes: 15
+  block_before_critical_minutes: 30
+  block_after_critical_minutes: 30
+  critical_keywords:
+    - "FOMC"
+    - "NFP"
+    - "Nonfarm"
+    - "CPI"
+    - "Fed"
+    - "Powell"
+  impact_levels_block: ["high"]   # Finnhub impact strings (case-insensitive)
+
+# Backtest (Telegram /backtest + CLI python -m backtest)
+backtest:
+  default_csv: ""               # Ví dụ: data/backtest_eurusd_m15.csv (tương đối project root)
+  default_symbol: EURUSD
+  initial_balance: 10000
+  step_bars: 4
+  min_m15_bars: 120
+
 # System
 system:
   scan_interval_seconds: 15
   db_path: "data/fxbot.db"
   log_level: "INFO"
   log_dir: "logs"
-  auto_mode: true                 # Start in auto mode
+  auto_mode: true                 # Hybrid: auto-execute when session allows (London/NY/overlap)
+  execution_enabled: false        # Master switch: allow MT5 orders (enable after testing; true on mock dev)
+  signal_scan_enabled: true       # Run SMC scan
+  signal_dedupe_minutes: 30
+  max_signals_per_scan_per_symbol: 2

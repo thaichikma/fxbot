@@ -4,9 +4,9 @@ MetaTrader5>=5.0.45; sys_platform == 'win32'
 pandas>=2.1.0
 numpy>=1.25.0
 
-# Technical Analysis
-smartmoneyconcepts>=0.0.21
-pandas-ta>=0.3.14b
+# Technical Analysis — SMC implemented in src/strategy/smc_engine.py (pandas).
+# smartmoneyconcepts pulls numba/llvmlite; optional on Windows if you switch engines.
+# pandas-ta>=0.3.14b  # optional indicators
 
 # Async
 asyncio-mqtt>=0.16.0

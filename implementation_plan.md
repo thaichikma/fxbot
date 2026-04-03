@@ -921,11 +921,13 @@ class BacktestReporter:
 
 ### Phase 5: Deployment & Challenge (Week 9+)
 
+**Tài liệu triển khai đầy đủ:** [`docs/deployment.md`](docs/deployment.md) (VPS, MT5, `.env`, Scheduled Task, FTMO trial, go-live).
+
 1. **Windows VPS Setup**
    - Contabo/Hetzner Windows VPS ($7-10/mo)
    - Install MT5 terminal + Python 3.11
    - Configure auto-login, auto-start
-   - Setup scheduled task to restart bot on crash
+   - Scripts: `scripts/windows/run-fxbot.ps1`, `register-scheduled-task.ps1`, `preflight.ps1`
 
 2. **FTMO Free Trial**
    - Register FTMO Free Trial (free, same as real challenge)
@@ -953,21 +955,14 @@ High-level:
 
 ---
 
-## Open Questions
+## Resolved decisions (2026-04-03)
 
-> [!IMPORTANT]
-> **Q1**: Bạn đã có FTMO account chưa? Hoặc sẽ đăng ký Free Trial trước?
-
-> [!IMPORTANT]
-> **Q2**: Bạn có preference về Telegram bot library? (`python-telegram-bot` vs `aiogram`)
-> - `python-telegram-bot`: Phổ biến, documentation tốt, bạn đã dùng cho Sniper Bot
-> - `aiogram`: Native async, nhẹ hơn, modern API
-
-> [!NOTE]
-> **Q3**: News data source preference?
-> - **Finnhub** (free tier, API key required, reliable)
-> - **Market Calendar Tool** (scraper, free, may break)
-> - **Manual CSV** (stable nhưng không real-time)
+| # | Topic | Decision |
+|---|--------|----------|
+| **Q1** | FTMO account | Đã có tài khoản — không chờ đăng ký Free Trial để lập kế hoạch; vẫn nên chạy demo/paper theo Phase 4–5 trước khi challenge thật. |
+| **Q2** | Telegram library | **`python-telegram-bot`** (đã dùng ở Phase 1; không đổi stack). |
+| **Q3** | News / economic calendar | **Finnhub** — API key có sẵn; map vào biến môi trường `FINNHUB_API_KEY` (xem `.env.example`). |
+| **Phase 2 scope** | Execution | **Đã đồng ý:** Phase 2 chỉ signal + session/news filter + tests; **không** mở lệnh live — execution đầy đủ ở Phase 3. |
 
 ---
 

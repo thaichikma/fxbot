@@ -14,6 +14,7 @@ FXBot is an automated MT5 trading bot specifically designed for FTMO prop firm c
 - [Codebase Summary](docs/codebase-summary.md)
 - [Code Standards](docs/code-standards.md)
 - [Project Roadmap](docs/project-roadmap.md)
+- [Deployment (Windows VPS + FTMO)](docs/deployment.md)
 
 ## Development Setup (MacOS)
 ```bash
@@ -27,4 +28,4 @@ pytest tests/
 ```
 
 ## Production Deployment
-Targeting Windows VPS with native MetaTrader 5 Terminal installations bridging to `mt5_client.py`.
+Chạy trên **Windows VPS** với MT5 Terminal và biến môi trường trong `.env`. Chi tiết: [docs/deployment.md](docs/deployment.md) và [scripts/windows/README.md](scripts/windows/README.md).

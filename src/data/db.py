@@ -179,6 +179,30 @@ class Database:
         await self.db.execute(sql, [status, signal_id])
         await self.db.commit()
 
+    async def has_similar_signal_recent(
+        self,
+        symbol: str,
+        direction: str,
+        entry_price: float,
+        *,
+        minutes: int = 30,
+        price_epsilon: float = 1e-4,
+    ) -> bool:
+        """True if a comparable signal was stored recently (dedupe for Telegram)."""
+        sql = """
+            SELECT 1 FROM signals
+            WHERE symbol = ? AND direction = ?
+              AND datetime(created_at) > datetime('now', ?)
+              AND ABS(entry_price - ?) < ?
+            LIMIT 1
+        """
+        cursor = await self.db.execute(
+            sql,
+            [symbol, direction, f"-{int(minutes)} minutes", entry_price, price_epsilon],
+        )
+        row = await cursor.fetchone()
+        return row is not None
+
     # ─── Daily PnL ────────────────────────────────────────────
 
     async def upsert_daily_pnl(self, data: dict) -> None:

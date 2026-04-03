@@ -174,7 +174,7 @@ class TestMaxDailyTrades:
 
     def test_at_limit_blocked(self, guardian, tracker, sample_signal):
         """At max daily trades — blocked."""
-        tracker._trade_count = 8
+        tracker._opens_today = 8
         approved, reason = guardian.can_open_trade(sample_signal, 0.02, 10000.0)
         assert approved is False
         assert "daily trades" in reason.lower()

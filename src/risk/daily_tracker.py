@@ -38,6 +38,7 @@ class DailyTracker:
         self._max_equity: float = starting_balance
         self._min_equity: float = starting_balance
         self._trade_count: int = 0
+        self._opens_today: int = 0
         self._winning_trades: int = 0
         self._losing_trades: int = 0
         self._request_count: int = 0
@@ -63,6 +64,7 @@ class DailyTracker:
             self._realized_pnl = 0.0
             self._unrealized_pnl = 0.0
             self._trade_count = 0
+            self._opens_today = 0
             self._winning_trades = 0
             self._losing_trades = 0
             self._request_count = 0
@@ -95,6 +97,11 @@ class DailyTracker:
         """Update starting balance (called at daily reset)."""
         self._starting_balance = new_balance
 
+    def record_trade_opened(self) -> None:
+        """Count a new position open (for max daily trades / FTMO guardian)."""
+        self._check_and_reset()
+        self._opens_today += 1
+
     def record_trade_closed(self, pnl: float) -> None:
         """Record a closed trade's PnL."""
         self._check_and_reset()
@@ -118,6 +125,11 @@ class DailyTracker:
     def increment_request(self) -> None:
         """Increment daily MT5 request counter."""
         self._request_count += 1
+
+    def sync_requests(self, count: int) -> None:
+        """Mirror MT5 client request counter (hyperactivity tracking)."""
+        self._check_and_reset()
+        self._request_count = max(self._request_count, int(count))
 
     def load_history(self, daily_records: list[dict]) -> None:
         """Load historical daily PnL from database."""
@@ -185,9 +197,14 @@ class DailyTracker:
         return count
 
     def get_today_trade_count(self) -> int:
-        """Number of trades today."""
+        """Number of closed trades today (legacy name)."""
         self._check_and_reset()
         return self._trade_count
+
+    def get_today_open_count(self) -> int:
+        """Positions opened today (for max daily trades guard)."""
+        self._check_and_reset()
+        return self._opens_today
 
     def get_today_request_count(self) -> int:
         """Number of MT5 API requests today."""

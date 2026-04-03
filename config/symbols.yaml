@@ -50,13 +50,12 @@ symbols:
     margin_rate: 0.0333
 
 # Correlation groups (for exposure management)
+# EURUSD/GBPUSD: USD quote; USDJPY: USD base — RiskManager counts same-direction exposure in usd_pairs.
 correlation_groups:
   usd_pairs:
-    - "EURUSD"     # EUR: counter USD
-    - "GBPUSD"     # GBP: counter USD
-    - "USDJPY"     # JPY: base USD
-    note: "EURUSD & GBPUSD positively correlated. USDJPY inversely correlated."
-  
+    - "EURUSD"
+    - "GBPUSD"
+    - "USDJPY"
+    - "XAUUSD"
   gold_usd:
-    - "XAUUSD"     # Gold: counter USD
-    note: "Gold inversely correlated with USD. Similar direction to EURUSD."
+    - "XAUUSD"

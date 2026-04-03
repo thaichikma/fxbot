@@ -10,9 +10,13 @@ Full command suite implemented in Phase 3.
 from __future__ import annotations
 
 import asyncio
+import functools
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from loguru import logger
+
+from backtest.run import run_backtest_report
 
 try:
     from telegram import Update
@@ -27,6 +31,7 @@ except ImportError:
     logger.warning("python-telegram-bot not installed — Telegram bot disabled")
 
 if TYPE_CHECKING:
+    from src.core.trading_state import TradingState
     from src.risk.ftmo_guardian import FTMOGuardian
     from src.risk.daily_tracker import DailyTracker
 
@@ -49,12 +54,24 @@ class TelegramBot:
         guardian: Optional[FTMOGuardian] = None,
         tracker: Optional[DailyTracker] = None,
         mt5_client: Any = None,
+        trading_state: Optional["TradingState"] = None,
+        order_manager: Any = None,
+        session_filter: Any = None,
+        news_filter: Any = None,
+        settings: Optional[dict] = None,
+        project_root: Path | str | None = None,
     ):
         self.token = token
         self.chat_id = chat_id
+        self.project_root = Path(project_root).resolve() if project_root else None
         self.guardian = guardian
         self.tracker = tracker
         self.mt5_client = mt5_client
+        self.trading_state = trading_state
+        self.order_manager = order_manager
+        self.session_filter = session_filter
+        self.news_filter = news_filter
+        self.settings = settings or {}
         self._app: Any = None
         self._running = False
 
@@ -97,6 +114,14 @@ class TelegramBot:
             CommandHandler("ping", self._cmd_ping),
             CommandHandler("ftmo", self._cmd_ftmo),
             CommandHandler("kill", self._cmd_kill),
+            CommandHandler("auto", self._cmd_auto),
+            CommandHandler("exec", self._cmd_exec),
+            CommandHandler("risk", self._cmd_risk),
+            CommandHandler("trades", self._cmd_trades),
+            CommandHandler("session", self._cmd_session),
+            CommandHandler("config", self._cmd_config),
+            CommandHandler("challenge", self._cmd_challenge),
+            CommandHandler("backtest", self._cmd_backtest),
         ]
         for handler in handlers:
             self._app.add_handler(handler)
@@ -120,11 +145,15 @@ class TelegramBot:
         msg = (
             "📋 *Available Commands*\n"
             "─────────────────\n"
-            "🔹 /status — Account status\n"
-            "🔹 /ftmo — FTMO dashboard\n"
-            "🔹 /ping — Check bot alive\n"
-            "🔹 /kill — Emergency close all\n"
-            "\n_More commands in Phase 3_"
+            "🔹 /status /ping /config\n"
+            "🔹 /ftmo /challenge\n"
+            "🔹 /auto on|off — Auto mode (session)\n"
+            "🔹 /exec on|off — Allow MT5 orders\n"
+            "🔹 /risk [pct] — Risk %% per trade\n"
+            "🔹 /trades — Open positions\n"
+            "🔹 /session — Session filter\n"
+            "🔹 /kill — Kill switch + close all\n"
+            "🔹 /backtest — Chạy backtest (CSV M15)\n"
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -207,17 +236,197 @@ class TelegramBot:
         await update.message.reply_text(msg, parse_mode="Markdown")
 
     async def _cmd_kill(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Emergency kill switch."""
+        """Emergency kill switch + close all positions."""
         if self.guardian:
             self.guardian.activate_kill_switch("Manual /kill command")
-            await update.message.reply_text(
-                "🚨 *KILL SWITCH ACTIVATED*\n"
-                "All trading halted.\n"
-                "Close all positions manually or restart bot.",
-                parse_mode="Markdown",
+        lines = ["🚨 *KILL SWITCH ACTIVATED*", "Trading halted."]
+        if self.order_manager:
+            msgs = await self.order_manager.close_all_positions()
+            if msgs:
+                lines.append("Closed: " + "; ".join(msgs[:5]))
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+    async def _cmd_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Toggle hybrid auto mode (execute when session allows)."""
+        if not self.trading_state:
+            await update.message.reply_text("⚠️ Trading state not wired")
+            return
+        args = context.args or []
+        if not args:
+            await update.message.reply_text(f"auto_mode = `{self.trading_state.auto_mode}`")
+            return
+        v = args[0].lower()
+        if v == "on":
+            self.trading_state.auto_mode = True
+        elif v == "off":
+            self.trading_state.auto_mode = False
+        await update.message.reply_text(f"auto_mode = `{self.trading_state.auto_mode}`")
+
+    async def _cmd_exec(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Toggle order execution (master switch)."""
+        if not self.trading_state:
+            await update.message.reply_text("⚠️ Trading state not wired")
+            return
+        args = context.args or []
+        if not args:
+            await update.message.reply_text(f"execution_enabled = `{self.trading_state.execution_enabled}`")
+            return
+        v = args[0].lower()
+        if v == "on":
+            self.trading_state.execution_enabled = True
+        elif v == "off":
+            self.trading_state.execution_enabled = False
+        await update.message.reply_text(f"execution_enabled = `{self.trading_state.execution_enabled}`")
+
+    async def _cmd_risk(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Set or show risk per trade (%%)."""
+        if not self.trading_state:
+            await update.message.reply_text("⚠️ Trading state not wired")
+            return
+        args = context.args or []
+        risk_def = 1.0
+        if self.settings.get("risk"):
+            risk_def = float(self.settings["risk"].get("risk_per_trade", 0.01)) * 100
+        if not args:
+            if self.trading_state.risk_per_trade is not None:
+                pct = self.trading_state.risk_per_trade * 100
+                await update.message.reply_text(f"risk override = `{pct:.2f}%`")
+            else:
+                await update.message.reply_text(f"risk = `{risk_def:.2f}%` (from settings)")
+            return
+        try:
+            pct = float(args[0])
+            self.trading_state.risk_per_trade = pct / 100.0
+            await update.message.reply_text(f"risk = `{pct:.2f}%`")
+        except ValueError:
+            await update.message.reply_text("Usage: /risk 0.5")
+
+    async def _cmd_trades(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """List open MT5 positions."""
+        if not self.mt5_client:
+            await update.message.reply_text("⚠️ No MT5")
+            return
+        pos = self.mt5_client.get_positions()
+        if not pos:
+            await update.message.reply_text("No open positions.")
+            return
+        lines = ["📊 *Open positions*", "─────────────────"]
+        for p in pos[:15]:
+            lines.append(
+                f"`{p.get('ticket')}` {p.get('symbol')} {p.get('type')} "
+                f"{p.get('volume', 0):.2f} | P/L ${p.get('profit', 0):.2f}"
             )
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+    async def _cmd_session(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Current session (UTC)."""
+        if not self.session_filter:
+            await update.message.reply_text("⚠️ Session filter not wired")
+            return
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        name = self.session_filter.classify_session(now)
+        auto = self.session_filter.auto_trade_allowed(now)
+        q = self.session_filter.session_quality(now)
+        await update.message.reply_text(
+            f"Session: `{name}`\nauto_trade_allowed: `{auto}`\nquality: `{q:.2f}`\n(UTC now)",
+            parse_mode="Markdown",
+        )
+
+    async def _cmd_config(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show key runtime flags."""
+        sys_ = self.settings.get("system", {})
+        msg = (
+            f"*Runtime*\n"
+            f"auto_mode (YAML): `{sys_.get('auto_mode')}`\n"
+            f"execution (YAML): `{sys_.get('execution_enabled')}`\n"
+        )
+        if self.trading_state:
+            msg += (
+                f"state.auto: `{self.trading_state.auto_mode}`\n"
+                f"state.exec: `{self.trading_state.execution_enabled}`\n"
+            )
+        await update.message.reply_text(msg, parse_mode="Markdown")
+
+    async def _cmd_challenge(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Challenge progress summary."""
+        if not self.guardian or not self.mt5_client or not self.settings:
+            await update.message.reply_text("⚠️ Not initialized")
+            return
+        acc = self.settings.get("account", {})
+        eq = self.mt5_client.get_account_info().equity
+        st = self.guardian.get_status(eq)
+        init = float(acc.get("initial_balance", 10000))
+        profit = eq - init
+        tgt = init * 0.10 if acc.get("challenge_phase") == "phase1" else init * 0.05
+        msg = (
+            f"🏆 *Challenge*\n"
+            f"Phase: `{acc.get('challenge_phase')}`\n"
+            f"Profit: `${profit:+.2f}` / target ~`${tgt:.0f}`\n"
+            f"Equity: `${eq:,.2f}`\n"
+            f"Opens today: `{st['today_trades']}`\n"
+        )
+        await update.message.reply_text(msg, parse_mode="Markdown")
+
+    async def _cmd_backtest(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Chạy backtest từ CSV (M15) và gửi báo cáo reporter."""
+        root = self.project_root or Path(__file__).resolve().parent.parent.parent
+        bt = self.settings.get("backtest", {}) if self.settings else {}
+        default_symbol = str(bt.get("default_symbol", "EURUSD")).upper()
+        default_balance = float(bt.get("initial_balance", 10_000.0))
+        step = int(bt.get("step_bars", 4))
+        min_bars = int(bt.get("min_m15_bars", 120))
+
+        args = context.args or []
+        if len(args) == 0:
+            csv_rel = str(bt.get("default_csv", "") or "").strip()
+            if not csv_rel:
+                await update.message.reply_text(
+                    "Usage:\n"
+                    "• /backtest SYMBOL path/to/file.csv\n"
+                    "• /backtest path/to/file.csv (dùng default_symbol)\n"
+                    "• /backtest với backtest.default_csv trong config/settings.yaml",
+                )
+                return
+            symbol = default_symbol
+            csv_arg = csv_rel
+        elif len(args) == 1:
+            symbol = default_symbol
+            csv_arg = args[0]
         else:
-            await update.message.reply_text("⚠️ Guardian not initialized")
+            symbol = args[0].upper()
+            csv_arg = " ".join(args[1:])
+
+        await update.message.reply_text("⏳ Đang chạy backtest...")
+
+        loop = asyncio.get_running_loop()
+        try:
+            text = await loop.run_in_executor(
+                None,
+                functools.partial(
+                    run_backtest_report,
+                    root,
+                    symbol=symbol,
+                    csv=csv_arg,
+                    balance=default_balance,
+                    step_bars=step,
+                    min_m15_bars=min_bars,
+                ),
+            )
+        except FileNotFoundError as e:
+            await update.message.reply_text(f"❌ {e}")
+            return
+        except Exception as e:
+            logger.exception("Telegram /backtest failed")
+            err = str(e)[:3500]
+            await update.message.reply_text(f"❌ Backtest lỗi:\n{err}")
+            return
+
+        if len(text) > 4090:
+            text = text[:4040] + "\n\n...(truncated — Telegram 4096 char limit)"
+
+        await update.message.reply_text(text)
 
     # ─── Notification Methods ─────────────────────────────────
 

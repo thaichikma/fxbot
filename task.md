@@ -15,30 +15,33 @@
 - [x] Tests for FTMO Guardian (100% coverage)
 
 ## Phase 2: Strategy Core (Week 3-4)
-- [ ] SMC Engine (BOS/CHoCH, OB, FVG, Liquidity)
-- [ ] Session Filter
-- [ ] News Filter
-- [ ] Signal Scanner (multi-pair)
-- [ ] Tests for SMC Engine
+
+> Kế hoạch chi tiết (thứ tự, DoD, test): [`plans/260403-fxbot-phase2-strategy/plan.md`](plans/260403-fxbot-phase2-strategy/plan.md)
+
+- [x] SMC Engine (FVG + bias; pandas — không dùng smartmoneyconcepts)
+- [x] Session Filter
+- [x] News Filter (Finnhub + cache)
+- [x] Signal Scanner (multi-pair)
+- [x] Tests (session, news, smc, scanner) + main wiring (notify only)
 
 ## Phase 3: Execution & Risk (Week 5-6)
-- [ ] Risk Manager (position sizing, correlation)
-- [ ] Order Manager (entry, SL, TP, trailing, breakeven)
-- [ ] Hybrid mode logic
-- [ ] Telegram commands full suite
-- [ ] Main loop (main.py)
-- [ ] Integration tests
+- [x] Risk Manager (`risk_manager.py` — sizing + USD basket correlation)
+- [x] Order Manager (`order_manager.py` — market entry, partial TP, BE)
+- [x] Hybrid mode (`TradingState` + `session_filter.auto_trade` + `execution_enabled`)
+- [x] Telegram: `/auto`, `/exec`, `/risk`, `/trades`, `/session`, `/config`, `/challenge` + kill closes positions
+- [x] Main loop: `manage_open_trades` → scan → execute or signal-only
+- [x] Tests: `test_risk_manager.py` + guardian fix (`_opens_today`)
 
 ## Phase 4: Backtesting & Validation (Week 7-8)
-- [ ] Backtest engine
-- [ ] Performance reporter
-- [ ] FTMO challenge simulation
-- [ ] Paper trading validation
+- [x] Backtest engine (`backtest/engine.py` — walk-forward M15, SMC, fill model)
+- [x] Performance reporter (`backtest/reporter.py`)
+- [x] FTMO metrics + challenge hints (`backtest/ftmo_challenge.py`)
+- [x] Paper trading checklist (`backtest/paper.py`) + CLI `python -m backtest --csv ...`
 
 ## Phase 5: Deployment (Week 9+)
-- [ ] Windows VPS setup
-- [ ] FTMO Free Trial testing
-- [ ] Go live
+- [x] Windows VPS setup (hướng dẫn + script PowerShell: `docs/deployment.md`, `scripts/windows/`)
+- [x] FTMO Free Trial testing (checklist trong `docs/deployment.md` §6)
+- [x] Go live (checklist §7; thực hiện thủ công trên tài khoản FTMO)
 
 ## Phase 6: ML/AI Layer (Month 3-4)
 - [ ] Data collection pipeline

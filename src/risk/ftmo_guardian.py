@@ -238,12 +238,12 @@ class FTMOGuardian:
         return GuardianCheck(approved=True, reason="", check_name="max_positions")
 
     def _check_max_daily_trades(self) -> GuardianCheck:
-        """Check max trades per day."""
-        trade_count = self.tracker.get_today_trade_count()
-        if trade_count >= self.config.max_daily_trades:
+        """Check max new positions opened per day."""
+        open_count = self.tracker.get_today_open_count()
+        if open_count >= self.config.max_daily_trades:
             return GuardianCheck(
                 approved=False,
-                reason=f"⚠️ Max daily trades reached: {trade_count}/{self.config.max_daily_trades}",
+                reason=f"⚠️ Max daily trades reached: {open_count}/{self.config.max_daily_trades}",
                 check_name="max_daily_trades",
                 severity="warning",
             )
@@ -329,6 +329,6 @@ class FTMOGuardian:
             "overall_pnl_pct": overall_pct,
             "best_day_ratio": self.tracker.get_best_day_ratio() * 100,
             "trading_days": self.tracker.get_trading_days_count(),
-            "today_trades": self.tracker.get_today_trade_count(),
+            "today_trades": self.tracker.get_today_open_count(),
             "today_requests": self.tracker.get_today_request_count(),
         }

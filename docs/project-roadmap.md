@@ -8,25 +8,25 @@ The immediate goal focuses on generating a reliable trading bot structure adheri
 - Strict FTMO Rule Enforcement Guarding layer 
 - Telegram Control Shell and Monitoring Tracking Base
 
-## Phase 2: Strategy Core (In Progress)
+## Phase 2: Strategy Core (Completed)
 - Implementing `smartmoneyconcepts` library mapping
 - Market structural tracking (Bos, CHoCH, Fair value gaps, Order block recognition)
 - Implementing News Api and Time/Session scheduling 
 - Broad Signal filtering Scanner implementations
 
-## Phase 3: Execution & Risk (Pending)
+## Phase 3: Execution & Risk (Completed)
 - Advanced Scaling (Fractional closures triggering SL-Breakeven adjustments)
 - Multi-Order management linking tracking hashes to telegram outputs
 - Deep Configuration implementations (Correlation mapping and limits)
 
-## Phase 4: Backtesting & Validation (Pending)
+## Phase 4: Backtesting & Validation (Completed)
 - Simulating raw historical data processing 
 - Comprehensive paper environment runs simulating 1:1 true limit Challenge configurations
 
-## Phase 5: FTMO Demo to Live Sandbox (Pending)
-- Provisioning VPS Environments
-- Active deployments to standard FTMO Demo endpoints
-- Phase 1 and 2 Live verifications 
+## Phase 5: FTMO Demo to Live Sandbox (Completed)
+- Windows VPS provisioning và vận hành (xem [`deployment.md`](deployment.md))
+- Deploy tới FTMO Demo / Free Trial; xác minh Guardian và MetriX
+- Checklist go-live challenge trả phí
 
 ## Phase 6/7: ML Signal Quality Evaluation Pipeline (Pending)
 - Extracting historical signals out of SQLite tracking and processing post-event profitability analysis.
