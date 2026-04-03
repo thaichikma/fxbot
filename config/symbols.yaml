@@ -1,0 +1,62 @@
+# =============================================================
+# Symbol Specifications
+# =============================================================
+# Contract sizes and pip values for position sizing calculations.
+# Verify these against your broker's MT5 symbol specification.
+
+symbols:
+  XAUUSD:
+    description: "Gold vs US Dollar"
+    contract_size: 100            # 1 lot = 100 troy ounces
+    pip_size: 0.10                # 1 pip = $0.10 price change
+    pip_value_per_lot: 1.00       # $1.00 per pip per 0.01 lot
+    point_size: 0.01              # 1 point = $0.01 price change
+    digits: 2
+    currency_profit: "USD"
+    typical_spread_points: 30     # ~3 pips
+    margin_rate: 0.05             # 5% margin requirement
+
+  EURUSD:
+    description: "Euro vs US Dollar"
+    contract_size: 100000         # 1 lot = 100,000 units
+    pip_size: 0.0001              # 1 pip = 0.0001
+    pip_value_per_lot: 10.00      # $10.00 per pip per 1.0 lot
+    point_size: 0.00001           # 1 point = 0.00001
+    digits: 5
+    currency_profit: "USD"
+    typical_spread_points: 10     # 1 pip
+    margin_rate: 0.0333           # ~3.3%
+
+  GBPUSD:
+    description: "British Pound vs US Dollar"
+    contract_size: 100000
+    pip_size: 0.0001
+    pip_value_per_lot: 10.00
+    point_size: 0.00001
+    digits: 5
+    currency_profit: "USD"
+    typical_spread_points: 15     # 1.5 pips
+    margin_rate: 0.0333
+
+  USDJPY:
+    description: "US Dollar vs Japanese Yen"
+    contract_size: 100000
+    pip_size: 0.01                # JPY pairs: 1 pip = 0.01
+    pip_value_per_lot: 6.67       # ~$6.67 per pip per 1.0 lot (varies with rate)
+    point_size: 0.001
+    digits: 3
+    currency_profit: "JPY"        # Needs conversion to USD
+    typical_spread_points: 12
+    margin_rate: 0.0333
+
+# Correlation groups (for exposure management)
+correlation_groups:
+  usd_pairs:
+    - "EURUSD"     # EUR: counter USD
+    - "GBPUSD"     # GBP: counter USD
+    - "USDJPY"     # JPY: base USD
+    note: "EURUSD & GBPUSD positively correlated. USDJPY inversely correlated."
+  
+  gold_usd:
+    - "XAUUSD"     # Gold: counter USD
+    note: "Gold inversely correlated with USD. Similar direction to EURUSD."

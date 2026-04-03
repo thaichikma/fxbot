@@ -1,0 +1,113 @@
+# =============================================================
+# FXBot Settings — Main Configuration
+# =============================================================
+
+account:
+  broker: "FTMO"
+  account_type: "swing"           # normal | swing
+  challenge_type: "2-step"        # 1-step | 2-step
+  challenge_phase: "phase1"       # phase1 | phase2 | funded
+  initial_balance: 10000
+  currency: "USD"
+
+# Trading pairs
+pairs:
+  - symbol: "XAUUSD"
+    enabled: true
+    timeframes:
+      bias: "H4"
+      structure: "H1"
+      entry: "M15"
+    max_spread_points: 50
+    min_volume: 0.01
+    volume_step: 0.01
+
+  - symbol: "EURUSD"
+    enabled: true
+    timeframes:
+      bias: "H4"
+      structure: "H1"
+      entry: "M15"
+    max_spread_points: 20
+    min_volume: 0.01
+    volume_step: 0.01
+
+  - symbol: "GBPUSD"
+    enabled: true
+    timeframes:
+      bias: "H4"
+      structure: "H1"
+      entry: "M15"
+    max_spread_points: 25
+    min_volume: 0.01
+    volume_step: 0.01
+
+  - symbol: "USDJPY"
+    enabled: true
+    timeframes:
+      bias: "H4"
+      structure: "H1"
+      entry: "M15"
+    max_spread_points: 20
+    min_volume: 0.01
+    volume_step: 0.01
+
+# Risk management
+risk:
+  risk_per_trade: 0.01            # 1% per trade
+  max_concurrent_trades: 3
+  max_daily_trades: 8
+  max_correlation_trades: 2       # Max same-direction correlated pairs
+  max_lot_size: 1.0               # Hard cap lot size
+
+# Sessions (UTC times)
+sessions:
+  london:
+    start: "07:00"
+    end: "16:00"
+    auto_trade: true
+  new_york:
+    start: "12:30"
+    end: "21:00"
+    auto_trade: true
+  asian:
+    start: "23:00"
+    end: "07:00"
+    auto_trade: false
+
+# Strategy params
+strategy:
+  swing_length: 10
+  ob_lookback: 20
+  fvg_min_size_pips: 5
+  sl_buffer_pips: 5
+  tp_ratios:
+    - 1.5    # TP1 = 1.5R
+    - 2.0    # TP2 = 2.0R
+    - 3.0    # TP3 = 3.0R
+  tp_portions:
+    - 0.50   # Close 50% at TP1
+    - 0.30   # Close 30% at TP2
+    - 0.20   # Close 20% at TP3
+  breakeven_at_tp1: true
+  trailing_after_tp2: true
+  trailing_distance_pips: 20
+  signal_expiry_minutes: 60      # Signal expires after 60 min
+
+# Telegram
+telegram:
+  enabled: true
+
+# MT5
+mt5:
+  magic_number: 20260403
+  deviation: 20                   # Max slippage in points
+  filling_type: "ioc"             # ioc | fok | return
+
+# System
+system:
+  scan_interval_seconds: 15
+  db_path: "data/fxbot.db"
+  log_level: "INFO"
+  log_dir: "logs"
+  auto_mode: true                 # Start in auto mode

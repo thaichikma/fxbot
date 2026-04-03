@@ -1,0 +1,62 @@
+# =============================================================
+# FTMO Rules — IMMUTABLE (Do NOT modify)
+# =============================================================
+# These values enforce FTMO's hard limits.
+# The bot reads these as absolute constraints.
+# Modifying them may cause FTMO rule violations.
+
+challenges:
+  two_step:
+    phase1:
+      profit_target_pct: 0.10       # 10%
+      max_daily_loss_pct: 0.05      # 5%
+      max_overall_loss_pct: 0.10    # 10%
+      min_trading_days: 4
+      time_limit_days: null         # Unlimited
+    phase2:
+      profit_target_pct: 0.05       # 5%
+      max_daily_loss_pct: 0.05      # 5%
+      max_overall_loss_pct: 0.10    # 10%
+      min_trading_days: 4
+      time_limit_days: null
+    funded:
+      profit_target_pct: null       # No target
+      max_daily_loss_pct: 0.05      # 5%
+      max_overall_loss_pct: 0.10    # 10%
+      min_trading_days: null
+
+  one_step:
+    phase1:
+      profit_target_pct: 0.10
+      max_daily_loss_pct: 0.05
+      max_overall_loss_pct: 0.10
+      min_trading_days: 4
+      time_limit_days: null
+    funded:
+      profit_target_pct: null
+      max_daily_loss_pct: 0.05
+      max_overall_loss_pct: 0.10
+      min_trading_days: null
+
+# Safety buffers — trigger BEFORE hitting actual FTMO limits
+safety_buffers:
+  daily_loss_trigger_pct: 0.80      # Trigger at 80% of daily limit (e.g. $400 of $500)
+  overall_loss_trigger_pct: 0.90    # Trigger at 90% of overall limit
+  best_day_cap_pct: 0.40            # Stop trading when best day = 40% (rule is 50%)
+  hyperactivity_buffer: 200         # Stop at 1800 requests (limit 2000)
+
+# Best day rule
+best_day:
+  max_pct_of_total_profit: 0.50     # Best day must be < 50% of total positive days
+
+# Hyperactivity limits
+hyperactivity:
+  max_requests_per_day: 2000
+  max_open_orders: 200
+
+# Inactivity
+inactivity:
+  max_days_without_trade: 30
+
+# Daily reset timezone (FTMO uses CE(S)T)
+daily_reset_timezone: "Europe/Prague"
