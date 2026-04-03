@@ -198,7 +198,7 @@ async def main():
             project_root=ROOT,
         )
         await telegram.start()
-        await telegram.send_message("🚀 *FXBot Started*\nSystem online and ready.")
+        await telegram.send_message("🚀 FXBot Started\nSystem online and ready.")
     else:
         telegram = None
 
@@ -272,7 +272,7 @@ async def main():
     finally:
         # Cleanup
         if telegram:
-            await telegram.send_message("⛔ *FXBot Shutting Down*")
+            await telegram.send_message("⛔ FXBot Shutting Down")
             await telegram.stop()
         mt5_client.shutdown()
         await db.close()

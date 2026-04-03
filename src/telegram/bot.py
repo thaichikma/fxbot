@@ -603,8 +603,14 @@ class TelegramBot:
 
     # ─── Notification Methods ─────────────────────────────────
 
-    async def send_message(self, text: str, parse_mode: str = "Markdown") -> None:
-        """Send a message to the configured chat."""
+    async def send_message(self, text: str, parse_mode: str | None = None) -> None:
+        """
+        Gửi tin nhắn tới chat cấu hình.
+
+        Mặc định **không** dùng Markdown: nội dung backtest/lỗi thường có `*`, `_`, `` ` ``
+        gây lỗi Telegram \"Can't parse entities\".
+        Dùng HTML chỉ khi đã `escape()` toàn bộ phần động.
+        """
         if not self._app or not self.chat_id:
             logger.debug("Telegram send skipped (not configured): {}", text[:50])
             return
@@ -616,13 +622,20 @@ class TelegramBot:
                 parse_mode=parse_mode,
             )
         except Exception as e:
-            logger.error("Telegram send failed: {}", e)
+            if parse_mode:
+                logger.warning("Telegram send failed (parse_mode={}): {} — retry plain", parse_mode, e)
+                try:
+                    await self._app.bot.send_message(chat_id=self.chat_id, text=text)
+                except Exception as e2:
+                    logger.error("Telegram send failed (plain): {}", e2)
+            else:
+                logger.error("Telegram send failed: {}", e)
 
     async def notify_trade_opened(self, trade: dict) -> None:
         """Send trade opened notification."""
         direction_emoji = "🟢" if trade.get("direction") == "BUY" else "🔴"
         msg = (
-            f"{direction_emoji} *Trade Opened*\n"
+            f"{direction_emoji} Trade Opened\n"
             f"─────────────────\n"
             f"Symbol: {trade.get('symbol')}\n"
             f"Direction: {trade.get('direction')}\n"
@@ -639,7 +652,7 @@ class TelegramBot:
         pnl = trade.get("pnl", 0)
         emoji = "💰" if pnl > 0 else "💸"
         msg = (
-            f"{emoji} *Trade Closed*\n"
+            f"{emoji} Trade Closed\n"
             f"─────────────────\n"
             f"Symbol: {trade.get('symbol')}\n"
             f"PnL: ${pnl:+.2f}\n"
@@ -651,7 +664,7 @@ class TelegramBot:
         """Send signal-only notification (for manual execution)."""
         direction_emoji = "🟢" if signal.get("direction") == "BUY" else "🔴"
         msg = (
-            f"🔔 *Signal (Manual)*\n"
+            f"🔔 Signal (Manual)\n"
             f"─────────────────\n"
             f"{direction_emoji} {signal.get('direction')} {signal.get('symbol')}\n"
             f"Type: {signal.get('signal_type')}\n"
@@ -666,15 +679,15 @@ class TelegramBot:
 
     async def notify_trade_blocked(self, reason: str) -> None:
         """Send trade blocked notification."""
-        msg = f"🚫 *Trade Blocked*\n{reason}"
+        msg = f"🚫 Trade Blocked\n{reason}"
         await self.send_message(msg)
 
     async def notify_error(self, error: str) -> None:
-        """Send error notification."""
-        msg = f"❌ *Error*\n```\n{str(error)[:500]}\n```"
+        """Send error notification (plain text — Markdown breaks on stack traces)."""
+        msg = f"❌ Error\n{str(error)[:3500]}"
         await self.send_message(msg)
 
     async def notify_emergency(self, message: str) -> None:
         """Send emergency notification."""
-        msg = f"🚨🚨🚨 *EMERGENCY*\n{message}"
+        msg = f"🚨🚨🚨 EMERGENCY\n{message}"
         await self.send_message(msg)
