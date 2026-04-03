@@ -17,7 +17,7 @@ if (-not $ProjectRoot) {
     $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 }
 
-Write-Host "=== FXBot preflight ==="
+Write-Host '=== FXBot preflight ==='
 Write-Host "ProjectRoot: $ProjectRoot"
 
 $venvPy = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
@@ -25,20 +25,19 @@ if (Test-Path $venvPy) {
     Write-Host "[OK] venv: $venvPy"
     & $venvPy --version
 } else {
-    Write-Host "[FAIL] No .venv — run: python -m venv .venv ; pip install -r requirements.txt"
+    Write-Host '[FAIL] No .venv - run: python -m venv .venv ; pip install -r requirements.txt'
     $ok = $false
 }
 
 $envFile = Join-Path $ProjectRoot ".env"
 if (Test-Path $envFile) {
-    Write-Host "[OK] .env exists"
+    Write-Host '[OK] .env exists'
 } else {
-    Write-Host "[WARN] No .env — copy from .env.example"
+    Write-Host '[WARN] No .env - copy from .env.example'
 }
 
 if ($env:OS -like "*Windows*") {
     if (Test-Path $venvPy) {
-        # Single-quoted here-string so PowerShell does not parse Python as script (PS 5.1 safe).
         $code = @'
 import sys
 try:
@@ -52,10 +51,10 @@ except Exception as ex:
         if ($LASTEXITCODE -ne 0) { $ok = $false }
     }
 } else {
-    Write-Host "[SKIP] Not Windows — MetaTrader5 Python package is Windows-only"
+    Write-Host '[SKIP] Not Windows - MetaTrader5 Python package is Windows-only'
 }
 
 if (-not $ok) {
     exit 1
 }
-Write-Host "=== Done ==="
+Write-Host '=== Done ==='
