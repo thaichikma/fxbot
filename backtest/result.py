@@ -17,10 +17,12 @@ class SimulatedTrade:
     exit_time: datetime
     entry_price: float
     exit_price: float
-    pnl: float
+    pnl: float  # net after transaction_costs_usd
     pnl_pct: float
     outcome: str  # "win" | "loss" | "timeout"
     rr: float
+    pnl_gross: float = 0.0  # before spread/commission/swap model
+    transaction_costs_usd: float = 0.0
 
 
 @dataclass
@@ -48,3 +50,5 @@ class BacktestResult:
     ftmo_compliant: bool = True
     ftmo_fail_reason: str = ""
     challenge: dict[str, Any] = field(default_factory=dict)
+    total_transaction_costs_usd: float = 0.0
+    costs_enabled: bool = False

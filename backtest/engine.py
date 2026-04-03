@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 from loguru import logger
 
+from backtest.costs import costs_feature_enabled, trade_transaction_costs_usd
 from backtest.data_loader import build_multi_timeframe
 from backtest.ftmo_challenge import check_ftmo_compliance, simulate_two_step_challenge
 from backtest.result import BacktestResult, SimulatedTrade
@@ -60,9 +61,12 @@ class BacktestEngine:
 
     def __init__(self, settings: dict, symbols_specs: dict[str, dict[str, Any]]):
         self._settings = settings
+        self._symbols_specs = symbols_specs
         strategy = dict(settings.get("strategy", {}))
         self._risk_pct = float(settings.get("risk", {}).get("risk_per_trade", 0.01))
         self._smc = SMCEngine(strategy, symbols_specs)
+        self._costs_cfg = dict(settings.get("backtest", {}).get("costs", {}))
+        self._costs_enabled = costs_feature_enabled(settings)
 
     def run(
         self,
@@ -97,6 +101,7 @@ class BacktestEngine:
         equity_curve: list[tuple[datetime, float]] = [(m15.iloc[min_m15_bars]["time"], equity)]
         trades: list[SimulatedTrade] = []
         daily_pnls: dict[str, float] = {}
+        total_costs_usd = 0.0
         min_equity = equity
         max_daily_loss_pct = 0.0
 
@@ -146,17 +151,35 @@ class BacktestEngine:
             rr = abs(tp - entry) / sl_dist
 
             if outcome == "win":
-                pnl = risk * rr
+                pnl_gross = risk * rr
             elif outcome == "loss":
-                pnl = -risk
+                pnl_gross = -risk
             else:
                 move = (exit_px - entry) if direction == "BUY" else (entry - exit_px)
-                pnl = risk * (move / sl_dist) if sl_dist else 0.0
+                pnl_gross = risk * (move / sl_dist) if sl_dist else 0.0
 
+            exit_t = _ensure_utc(pd.Timestamp(m15.iloc[exit_j]["time"]).to_pydatetime())
+
+            cost_usd = 0.0
+            spec = self._symbols_specs.get(symbol.upper(), {})
+            if self._costs_enabled and spec:
+                cost_usd, _br = trade_transaction_costs_usd(
+                    settings=self._settings,
+                    symbol=symbol,
+                    direction=direction,
+                    entry_time=t,
+                    exit_time=exit_t,
+                    equity_at_entry=equity,
+                    entry_price=entry,
+                    sl_price=sl,
+                    spec=spec,
+                    costs_cfg=self._costs_cfg,
+                )
+                total_costs_usd += cost_usd
+
+            pnl = pnl_gross - cost_usd
             equity += pnl
             min_equity = min(min_equity, equity)
-            exit_t = m15.iloc[exit_j]["time"]
-            exit_t = _ensure_utc(pd.Timestamp(exit_t).to_pydatetime())
 
             day = exit_t.strftime("%Y-%m-%d")
             daily_pnls[day] = daily_pnls.get(day, 0.0) + pnl
@@ -180,6 +203,8 @@ class BacktestEngine:
                     pnl_pct=pnl_pct,
                     outcome=outcome,
                     rr=rr,
+                    pnl_gross=pnl_gross,
+                    transaction_costs_usd=cost_usd,
                 )
             )
 
@@ -225,6 +250,8 @@ class BacktestEngine:
             total_trades=total_trades,
             wins=len(wins),
             losses=len(losses),
+            total_transaction_costs_usd=total_costs_usd,
+            costs_enabled=self._costs_enabled,
         )
 
         ok, reason = check_ftmo_compliance(result, initial_balance)

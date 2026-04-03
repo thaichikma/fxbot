@@ -129,6 +129,13 @@ backtest:
   initial_balance: 10000
   step_bars: 4
   min_m15_bars: 120
+  # Spread / commission / swap (approximate — not tick-level; tune vs your FTMO symbol spec)
+  costs:
+    enabled: true
+    spread_mode: typical          # typical = symbols.yaml typical_spread_points | max_pair | none
+    commission_usd_per_lot_round_turn: 0.0   # e.g. 6–7 USD/lot RT forex; 0 = off
+    swap_long_usd_per_lot_per_night: 0.0
+    swap_short_usd_per_lot_per_night: 0.0
 
 # System
 system:

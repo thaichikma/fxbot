@@ -33,3 +33,6 @@ Chạy trên **Windows VPS** với MT5 Terminal và biến môi trường trong 
 ## Telegram — backtest
 - `/backtest` hoặc `/bt`: chạy backtest với CSV mặc định (`backtest.default_csv` trong `config/settings.yaml`; repo có `data/backtest/sample_m15.csv`).
 - `/backtest help` — hướng dẫn; `/backtest status` — kiểm tra symbol và file mặc định.
+
+## Backtest — phí giao dịch (xấp xỉ)
+- Trong `config/settings.yaml`, mục `backtest.costs`: spread (theo `symbols.yaml`), commission/lot, swap qua đêm — **không** thay thế tick thật hay 100% khớp FTMO; chỉnh `commission_*` / `swap_*` theo spec broker.
