@@ -29,10 +29,11 @@ Cách dùng nhanh:
 • /bt — giống /backtest
 • /backtest help — bản hướng dẫn này
 • /backtest status — xem symbol + đường dẫn CSV mặc định + có file hay không
-• /backtest data\\backtest\\my.csv — 1 đối số = đường dẫn CSV (symbol = default_symbol)
-• /backtest XAUUSD data\\backtest\\my.csv — symbol + đường dẫn (có khoảng trắng thì gõ sau symbol)
+• /backtest data/backtest/my.csv — 1 đối số = đường dẫn CSV (symbol = default_symbol)
+• /backtest XAUUSD data/backtest/xau.csv — symbol + đường dẫn
 
-Lưu ý: đường dẫn tương đối thư mục gốc project (nơi có config/). Windows: dùng \\ hoặc /."""
+File CSV phải có thật trên máy chạy bot (copy vào repo, ví dụ data/backtest/xau.csv).
+Repo có sẵn: data/backtest/sample_m15.csv. Đường dẫn tương đối từ thư mục gốc (có config/). Dùng / hoặc \\ trên Windows."""
 
 try:
     from telegram import Update
@@ -487,7 +488,13 @@ class TelegramBot:
                 await status.delete()
             except Exception:
                 pass
-            await update.message.reply_text(f"Không tìm thấy file:\n{e}\n\nGõ /backtest help")
+            await update.message.reply_text(
+                "Không thấy file CSV trên máy chủ bot.\n\n"
+                "• Copy file M15 vào thư mục project, ví dụ: data/backtest/xau.csv\n"
+                "• Hoặc dùng file mẫu: data/backtest/sample_m15.csv\n"
+                "• Hoặc /backtest (không tham số) nếu default_csv trong settings trỏ đúng file có sẵn\n\n"
+                f"{e}\n\n/backtest help"
+            )
             return
         except Exception as e:
             logger.exception("Telegram /backtest failed")
