@@ -130,6 +130,7 @@ class TelegramBot:
             CommandHandler("ping", self._cmd_ping),
             CommandHandler("ftmo", self._cmd_ftmo),
             CommandHandler("kill", self._cmd_kill),
+            CommandHandler("unkill", self._cmd_unkill),
             CommandHandler("auto", self._cmd_auto),
             CommandHandler("exec", self._cmd_exec),
             CommandHandler("risk", self._cmd_risk),
@@ -175,6 +176,7 @@ class TelegramBot:
             "🔹 /trades — Open positions\n"
             "🔹 /session — Session filter\n"
             "🔹 /kill — Kill switch + close all\n"
+            "🔹 /unkill — Tắt kill switch (cho phép trade lại nếu /exec + session)\n"
             "🔹 /backtest hoặc /bt — backtest CSV M15 (/backtest help)\n"
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
@@ -267,6 +269,17 @@ class TelegramBot:
             if msgs:
                 lines.append("Closed: " + "; ".join(msgs[:5]))
         await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+    async def _cmd_unkill(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Tắt kill switch (không mở lại lệnh tự động — chỉ gỡ chặn Guardian)."""
+        if not self.guardian:
+            await update.message.reply_text("Guardian not initialized.")
+            return
+        self.guardian.deactivate_kill_switch()
+        await update.message.reply_text(
+            "Kill switch: OFF. Bot có thể giao dịch lại nếu "
+            "execution_enabled + auto/session cho phép (xem /config)."
+        )
 
     async def _cmd_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Toggle hybrid auto mode (execute when session allows)."""
