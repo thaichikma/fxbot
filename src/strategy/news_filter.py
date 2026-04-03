@@ -77,6 +77,8 @@ class NewsFilter:
         self._critical_keywords = [k.upper() for k in raw_kw]
         impacts = cfg.get("impact_levels_block") or ["high"]
         self._impact_block = {str(x).lower() for x in impacts}
+        # Set false if Finnhub key has no calendar access (403) or you want news off without removing the key.
+        self._calendar_enabled = bool(cfg.get("calendar_enabled", True))
 
         self._token = os.getenv("FINNHUB_API_KEY", "")
         self._cached_events: list[dict[str, Any]] = []
@@ -99,6 +101,11 @@ class NewsFilter:
         now = now or datetime.now(timezone.utc)
         if self._cache_fetched_at and (now - self._cache_fetched_at) < self._cache_ttl:
             return
+        if not self._calendar_enabled:
+            self._cached_events = []
+            self._cache_fetched_at = now
+            self._last_error = None
+            return
         if not self._token:
             logger.warning("FINNHUB_API_KEY not set — news filter inactive")
             self._cached_events = []
@@ -117,11 +124,24 @@ class NewsFilter:
                     if resp.status != 200:
                         text = await resp.text()
                         self._last_error = f"HTTP {resp.status}: {text[:200]}"
-                        logger.error("Finnhub calendar error: {}", self._last_error)
+                        self._cached_events = []
+                        self._cache_fetched_at = now
+                        if resp.status in (401, 403):
+                            logger.warning(
+                                "Finnhub economic calendar: access denied (HTTP {}). "
+                                "Free API keys often exclude this endpoint — "
+                                "news blocking is off. Fix: paid Finnhub tier, or set "
+                                "news.calendar_enabled: false in settings.yaml, or remove FINNHUB_API_KEY.",
+                                resp.status,
+                            )
+                        else:
+                            logger.error("Finnhub calendar error: {}", self._last_error)
                         return
                     data = await resp.json()
         except Exception as e:
             self._last_error = str(e)
+            self._cached_events = []
+            self._cache_fetched_at = now
             logger.error("Finnhub fetch failed: {}", e)
             return
 

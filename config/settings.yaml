@@ -104,9 +104,10 @@ mt5:
   deviation: 20                   # Max slippage in points
   filling_type: "ioc"             # ioc | fok | return
 
-# Economic calendar (Finnhub)
+# Economic calendar (Finnhub) — free keys often return 403 on economic calendar; set calendar_enabled: false
 news:
   provider: finnhub
+  calendar_enabled: true          # false = skip Finnhub HTTP (no news blocking from calendar)
   cache_ttl_minutes: 45
   block_before_high_minutes: 15
   block_after_high_minutes: 15
