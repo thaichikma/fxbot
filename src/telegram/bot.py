@@ -19,6 +19,21 @@ from loguru import logger
 
 from backtest.run import run_backtest_report
 
+# Telegram message limit; split long backtest output
+_TELEGRAM_TEXT_CHUNK = 4000
+
+_BACKTEST_HELP = """📊 Backtest (CSV M15: time,open,high,low,close)
+
+Cách dùng nhanh:
+• /backtest — chạy file mặc định trong config (backtest.default_csv)
+• /bt — giống /backtest
+• /backtest help — bản hướng dẫn này
+• /backtest status — xem symbol + đường dẫn CSV mặc định + có file hay không
+• /backtest data\\backtest\\my.csv — 1 đối số = đường dẫn CSV (symbol = default_symbol)
+• /backtest XAUUSD data\\backtest\\my.csv — symbol + đường dẫn (có khoảng trắng thì gõ sau symbol)
+
+Lưu ý: đường dẫn tương đối thư mục gốc project (nơi có config/). Windows: dùng \\ hoặc /."""
+
 try:
     from telegram import Update
     from telegram.ext import (
@@ -122,7 +137,7 @@ class TelegramBot:
             CommandHandler("session", self._cmd_session),
             CommandHandler("config", self._cmd_config),
             CommandHandler("challenge", self._cmd_challenge),
-            CommandHandler("backtest", self._cmd_backtest),
+            CommandHandler(["backtest", "bt"], self._cmd_backtest),
         ]
         for handler in handlers:
             self._app.add_handler(handler)
@@ -160,7 +175,7 @@ class TelegramBot:
             "🔹 /trades — Open positions\n"
             "🔹 /session — Session filter\n"
             "🔹 /kill — Kill switch + close all\n"
-            "🔹 /backtest — Chạy backtest (CSV M15)\n"
+            "🔹 /backtest hoặc /bt — backtest CSV M15 (/backtest help)\n"
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -382,6 +397,15 @@ class TelegramBot:
         )
         await update.message.reply_text(msg, parse_mode="Markdown")
 
+    async def _reply_text_chunks(self, update: Update, text: str, chunk: int = _TELEGRAM_TEXT_CHUNK) -> None:
+        """Send long plain text in multiple messages (Telegram limit 4096)."""
+        text = text.strip()
+        if not text:
+            await update.message.reply_text("(empty)")
+            return
+        for i in range(0, len(text), chunk):
+            await update.message.reply_text(text[i : i + chunk])
+
     async def _cmd_backtest(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Chạy backtest từ CSV (M15) và gửi báo cáo reporter."""
         root = self.project_root or Path(__file__).resolve().parent.parent.parent
@@ -390,20 +414,38 @@ class TelegramBot:
         default_balance = float(bt.get("initial_balance", 10_000.0))
         step = int(bt.get("step_bars", 4))
         min_bars = int(bt.get("min_m15_bars", 120))
+        csv_default = str(bt.get("default_csv", "") or "").strip()
+        default_path = (root / csv_default).resolve() if csv_default else None
 
-        args = context.args or []
-        if len(args) == 0:
-            csv_rel = str(bt.get("default_csv", "") or "").strip()
-            if not csv_rel:
+        raw_args = context.args or []
+        args = [a.strip() for a in raw_args if a.strip()]
+
+        if len(args) >= 1:
+            sub = args[0].lower()
+            if sub in ("help", "h", "?"):
+                await update.message.reply_text(_BACKTEST_HELP)
+                return
+            if sub == "status":
+                exists = default_path.is_file() if default_path else False
+                line_path = str(default_path) if default_path else "(chưa set default_csv)"
                 await update.message.reply_text(
-                    "Usage:\n"
-                    "• /backtest SYMBOL path/to/file.csv\n"
-                    "• /backtest path/to/file.csv (dùng default_symbol)\n"
-                    "• /backtest với backtest.default_csv trong config/settings.yaml",
+                    "📊 Backtest (config)\n"
+                    f"• default_symbol: {default_symbol}\n"
+                    f"• default_csv: {csv_default or '(trống)'}\n"
+                    f"• file tồn tại: {'có' if exists else 'không'}\n"
+                    f"• đường dẫn đầy đủ:\n{line_path}\n"
+                    f"• balance/step/min_bars: {default_balance} / {step} / {min_bars}",
+                )
+                return
+
+        if len(args) == 0:
+            if not csv_default:
+                await update.message.reply_text(
+                    "Chưa có backtest.default_csv trong settings.yaml.\n\n" + _BACKTEST_HELP,
                 )
                 return
             symbol = default_symbol
-            csv_arg = csv_rel
+            csv_arg = csv_default
         elif len(args) == 1:
             symbol = default_symbol
             csv_arg = args[0]
@@ -411,7 +453,7 @@ class TelegramBot:
             symbol = args[0].upper()
             csv_arg = " ".join(args[1:])
 
-        await update.message.reply_text("⏳ Đang chạy backtest...")
+        status = await update.message.reply_text("⏳ Đang chạy backtest...")
 
         loop = asyncio.get_running_loop()
         try:
@@ -428,18 +470,28 @@ class TelegramBot:
                 ),
             )
         except FileNotFoundError as e:
-            await update.message.reply_text(f"❌ {e}")
+            try:
+                await status.delete()
+            except Exception:
+                pass
+            await update.message.reply_text(f"Không tìm thấy file:\n{e}\n\nGõ /backtest help")
             return
         except Exception as e:
             logger.exception("Telegram /backtest failed")
             err = str(e)[:3500]
-            await update.message.reply_text(f"❌ Backtest lỗi:\n{err}")
+            try:
+                await status.delete()
+            except Exception:
+                pass
+            await update.message.reply_text(f"Backtest lỗi:\n{err}")
             return
 
-        if len(text) > 4090:
-            text = text[:4040] + "\n\n...(truncated — Telegram 4096 char limit)"
+        try:
+            await status.delete()
+        except Exception:
+            pass
 
-        await update.message.reply_text(text)
+        await self._reply_text_chunks(update, text)
 
     # ─── Notification Methods ─────────────────────────────────
 

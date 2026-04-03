@@ -14,6 +14,8 @@ build/
 data/*.db
 data/*.sqlite
 *.csv
+# Tracked sample for /backtest default (see config settings backtest.default_csv)
+!data/backtest/sample_m15.csv
 
 # Logs
 logs/

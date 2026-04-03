@@ -29,3 +29,7 @@ pytest tests/
 
 ## Production Deployment
 Chạy trên **Windows VPS** với MT5 Terminal và biến môi trường trong `.env`. Chi tiết: [docs/deployment.md](docs/deployment.md) và [scripts/windows/README.md](scripts/windows/README.md).
+
+## Telegram — backtest
+- `/backtest` hoặc `/bt`: chạy backtest với CSV mặc định (`backtest.default_csv` trong `config/settings.yaml`; repo có `data/backtest/sample_m15.csv`).
+- `/backtest help` — hướng dẫn; `/backtest status` — kiểm tra symbol và file mặc định.

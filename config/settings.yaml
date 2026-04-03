@@ -122,9 +122,9 @@ news:
     - "Powell"
   impact_levels_block: ["high"]   # Finnhub impact strings (case-insensitive)
 
-# Backtest (Telegram /backtest + CLI python -m backtest)
+# Backtest (Telegram /backtest, /bt + CLI python -m backtest)
 backtest:
-  default_csv: ""               # Ví dụ: data/backtest_eurusd_m15.csv (tương đối project root)
+  default_csv: data/backtest/sample_m15.csv   # M15 OHLC; đổi path hoặc /backtest path\to\file.csv
   default_symbol: EURUSD
   initial_balance: 10000
   step_bars: 4
