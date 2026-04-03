@@ -54,6 +54,8 @@ class MT5Mock:
             "EURUSD": 1.0850,
             "GBPUSD": 1.2650,
             "USDJPY": 150.50,
+            "BTCUSD": 98500.00,
+            "ETHUSD": 3450.00,
         }
 
         logger.info("MT5Mock initialized | balance={}", initial_balance)
@@ -159,7 +161,7 @@ class MT5Mock:
         self._count_request()
 
         base_price = self._prices.get(symbol, 1.0)
-        pip_size = {"XAUUSD": 0.10, "USDJPY": 0.01}.get(symbol, 0.0001)
+        pip_size = {"XAUUSD": 0.10, "USDJPY": 0.01, "BTCUSD": 0.01, "ETHUSD": 0.01}.get(symbol, 0.0001)
 
         # Timeframe to minutes
         tf_minutes = {

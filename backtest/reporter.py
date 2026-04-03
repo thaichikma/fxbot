@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from backtest.metrics_extra import extended_metrics_summary
 from backtest.result import BacktestResult
 
 
@@ -16,13 +17,20 @@ class BacktestReporter:
             f"📅 {result.start.date()} → {result.end.date()}",
             f"💰 ${result.initial_balance:,.0f} → ${result.final_balance:,.0f} ({result.total_return_pct:+.2f}%)",
         ]
+        if result.m1_resolution_for_exit:
+            lines.append("🕐 Exit path: **M1** (tín hiệu entry vẫn từ SMC trên **M15**)")
         if result.costs_enabled:
             lines.append(
                 f"💸 Costs (model): ${result.total_transaction_costs_usd:,.2f} "
                 "(spread+commission+swap — not tick-perfect)",
             )
+        ex = extended_metrics_summary(result)
+        sharpe_line = ""
+        if ex.get("sharpe_ratio_approx") is not None:
+            sharpe_line = f" | Sharpe~: {ex['sharpe_ratio_approx']:.2f}"
         lines += [
             f"📈 Trades: {result.total_trades} | Win rate: {result.win_rate*100:.1f}% | PF: {result.profit_factor:.2f}",
+            f"💡 Expectancy: ${ex['expectancy_usd_per_trade']:.2f}/trade{sharpe_line}",
             f"📉 Max DD: {result.max_drawdown_pct:.2f}% | Max daily loss: {result.max_daily_loss_pct:.2f}%",
             f"⭐ Best day: ${result.best_day_profit:.0f} ({result.best_day_ratio*100:.0f}% of +days)",
             f"🛡️ FTMO check: {'✅' if result.ftmo_compliant else '❌'} {result.ftmo_fail_reason or ''}",

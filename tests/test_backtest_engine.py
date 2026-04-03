@@ -59,6 +59,41 @@ def test_engine_run_smoke(settings, specs):
     assert "final_phase" in r.challenge
 
 
+def test_engine_m1_exit_path(settings, specs):
+    """Entry logic trên M15; exit có thể đánh giá trên M1."""
+    t0 = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    m15_rows = []
+    m1_rows = []
+    p = 1.1000
+    for i in range(200):
+        t = t0 + timedelta(minutes=15 * i)
+        m15_rows.append(
+            {
+                "time": t,
+                "open": p,
+                "high": p + 0.0005,
+                "low": p - 0.0005,
+                "close": p + 0.0001,
+            }
+        )
+    for i in range(200 * 15):
+        t = t0 + timedelta(minutes=i)
+        m1_rows.append(
+            {
+                "time": t,
+                "open": p,
+                "high": p + 0.0003,
+                "low": p - 0.0003,
+                "close": p,
+            }
+        )
+    m15 = pd.DataFrame(m15_rows)
+    m1 = pd.DataFrame(m1_rows)
+    eng = BacktestEngine(settings, specs)
+    r = eng.run("EURUSD", m15, initial_balance=10_000.0, step_bars=20, min_m15_bars=100, m1=m1)
+    assert isinstance(r.m1_resolution_for_exit, bool)
+
+
 def test_run_backtest_report_uses_project_config(tmp_path):
     """run_backtest_report loads config từ project root + CSV tuyệt đối."""
     root = Path(__file__).resolve().parent.parent

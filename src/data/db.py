@@ -6,11 +6,15 @@ Tables:
 - signals: Generated signal history
 - daily_pnl: Daily performance snapshots
 - config_state: Runtime state persistence (key-value)
+- ohlc_bars: OHLC đa khung (symbol, tf, ts) — giả lập / phân tích trend
+- simulation_runs, simulation_steps: bản ghi walk-forward + metrics JSON
 """
 
 import aiosqlite
 from pathlib import Path
 from loguru import logger
+
+from src.data.mtf_schema import MTF_FULL_SCHEMA
 
 # SQL for table creation
 SCHEMA_SQL = """
@@ -93,6 +97,9 @@ CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
 CREATE INDEX IF NOT EXISTS idx_signals_created ON signals(created_at);
 CREATE INDEX IF NOT EXISTS idx_daily_pnl_date ON daily_pnl(date);
 """
+
+# OHLC đa khung + simulation (giả lập / đánh giá trend)
+SCHEMA_SQL += "\n" + MTF_FULL_SCHEMA
 
 
 class Database:

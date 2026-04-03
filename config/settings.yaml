@@ -52,6 +52,33 @@ pairs:
     min_volume: 0.01
     volume_step: 0.01
 
+  # Crypto — H1 xu hướng + M5 entry (portfolio mở rộng; bật khi broker có symbol)
+  - symbol: "BTCUSD"
+    enabled: false
+    strategy: h1_m5
+    h1_bars: 500
+    m5_bars: 1000
+    timeframes:
+      bias: "H1"
+      structure: "H1"
+      entry: "M5"
+    max_spread_points: 200
+    min_volume: 0.01
+    volume_step: 0.01
+
+  - symbol: "ETHUSD"
+    enabled: false
+    strategy: h1_m5
+    h1_bars: 500
+    m5_bars: 1000
+    timeframes:
+      bias: "H1"
+      structure: "H1"
+      entry: "M5"
+    max_spread_points: 150
+    min_volume: 0.01
+    volume_step: 0.01
+
 # Risk management
 risk:
   risk_per_trade: 0.01            # 1% per trade
@@ -59,6 +86,15 @@ risk:
   max_daily_trades: 8
   max_correlation_trades: 2       # Max same-direction correlated pairs
   max_lot_size: 1.0               # Hard cap lot size
+
+# Machine learning (optional — pip install -r requirements-ml.txt; train: scripts/ml_train.py)
+ml:
+  enabled: false
+  model_path: ""                 # ví dụ: models/xgb_eurusd.pkl
+  prob_threshold: 0.58           # P(up) >= threshold → BUY; <= 1-threshold → SELL
+  entry_timeframe_key: M15       # khớp cột trong dict data của MLEngine
+  min_ohlc_rows: 60
+  sl_atr_mult: 2.0               # hệ số nhân biên độ 20 nến (proxy SL)
 
 # Sessions (UTC times)
 sessions:
@@ -123,6 +159,10 @@ news:
   impact_levels_block: ["high"]   # Finnhub impact strings (case-insensitive)
 
 # Backtest (Telegram /backtest, /bt + CLI python -m backtest)
+# XAUUSD (file MT4 local, *.csv thường bị gitignore): đặt M15 tại data/XAU_15m_data.csv
+#   python -m backtest --symbol XAUUSD --csv data/XAU_15m_data.csv --max-bars 50000 --step 4
+# Các TF khác (1h, 4h, 1d, …) dùng để đối chiếu ngoài; engine chỉ cần M15 (tự resample H1/H4).
+# scripts/xau_data_info.py — xem nhanh phạm vi ngày / số dòng.
 backtest:
   default_csv: data/backtest/sample_m15.csv   # M15 OHLC; đổi path hoặc /backtest path\to\file.csv
   default_symbol: EURUSD
@@ -133,6 +173,8 @@ backtest:
   auto_fetch_mt5: true
   mt5_fetch_bars: 8000
   auto_csv_pattern: "data/backtest/{symbol}_m15.csv"
+  # M1: đánh giá đường đi SL/TP chi tiết (entry SMC vẫn trên M15). Để trống = chỉ M15.
+  m1_csv: ""
   # Spread / commission / swap — mô hình xấp xỉ; chỉnh theo MT5 Symbol spec / FTMO (thay đổi theo thời điểm).
   # Nguồn tham chiếu công khai: FTMO forex ~$2.50/lot/một chiều (~$5 RT/lot); swap EURUSD bậc ~vài USD/đêm/lot (broker-specific).
   # Vàng/CFD: FTMO dùng % notional — không khớp hoàn toàn với commission cố định/lot; giảm commission hoặc tắt nếu backtest XAU.
@@ -146,6 +188,7 @@ backtest:
 # System
 system:
   scan_interval_seconds: 15
+  # fxbot.db: trades/signals/daily_pnl + ohlc_bars (MTF) + simulation_* (giả lập đa khung)
   db_path: "data/fxbot.db"
   log_level: "INFO"
   log_dir: "logs"

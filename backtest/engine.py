@@ -23,6 +23,60 @@ def _ensure_utc(ts: datetime) -> datetime:
     return ts.astimezone(timezone.utc)
 
 
+def _m15_bar_index_for_ts(m15: pd.DataFrame, exit_t: datetime) -> int:
+    """Chỉ số nến M15 chứa thời điểm exit (time = mở nến, chuỗi tăng dần)."""
+    ts = pd.Timestamp(exit_t)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    ot = pd.to_datetime(m15["time"], utc=True)
+    pos = int(ot.searchsorted(ts, side="right")) - 1
+    return max(0, min(pos, len(m15) - 1))
+
+
+def _simulate_exit_m1(
+    m1: pd.DataFrame,
+    entry_time: datetime,
+    direction: str,
+    entry: float,
+    sl: float,
+    tp: float,
+    max_m1_bars: int = 1440,
+) -> tuple[str, datetime, float]:
+    """
+    Đánh giá SL/TP trên chuỗi M1 (độ phân giải cao).
+    Bắt đầu từ nến M1 đầu tiên có time > entry_time (sau khi đóng nến M15 tín hiệu).
+    Quy tắc cùng nến: SL trước (conservative).
+    """
+    m1 = m1.sort_values("time").reset_index(drop=True)
+    et = pd.Timestamp(entry_time)
+    if et.tzinfo is None:
+        et = et.tz_localize("UTC")
+    starts = pd.to_datetime(m1["time"], utc=True)
+    j0 = int(starts.searchsorted(et, side="right"))
+    end = min(j0 + max_m1_bars, len(m1))
+    if j0 >= len(m1):
+        return "timeout", _ensure_utc(et.to_pydatetime()), float(entry)
+
+    for j in range(j0, end):
+        row = m1.iloc[j]
+        lo = float(row["low"])
+        hi = float(row["high"])
+        ex_t = _ensure_utc(pd.Timestamp(row["time"]).to_pydatetime())
+        if direction == "BUY":
+            if lo <= sl:
+                return "loss", ex_t, sl
+            if hi >= tp:
+                return "win", ex_t, tp
+        else:
+            if hi >= sl:
+                return "loss", ex_t, sl
+            if lo <= tp:
+                return "win", ex_t, tp
+    last = m1.iloc[end - 1]
+    last_t = _ensure_utc(pd.Timestamp(last["time"]).to_pydatetime())
+    return "timeout", last_t, float(last["close"])
+
+
 def _simulate_exit(
     m15: pd.DataFrame,
     start_idx: int,
@@ -77,6 +131,8 @@ class BacktestEngine:
         step_bars: int = 4,
         min_m15_bars: int = 120,
         cooldown_bars: int = 8,
+        m1: pd.DataFrame | None = None,
+        max_m15_bars_for_exit: int = 96,
     ) -> BacktestResult:
         """
         Walk forward on M15; resample H1/H4 internally.
@@ -87,10 +143,22 @@ class BacktestEngine:
             initial_balance: starting equity
             step_bars: only run SMC every N M15 bars (perf)
             min_m15_bars: minimum history before first signal
+            m1: nếu có — đánh giá đường đi SL/TP trên M1 (entry vẫn từ SMC trên M15)
+            max_m15_bars_for_exit: giới hạn thời gian chờ lệnh (quy đổi ≈ ×15 nến M1)
         """
         m15 = m15.sort_values("time").reset_index(drop=True)
         if len(m15) < min_m15_bars:
             raise ValueError(f"Need at least {min_m15_bars} M15 bars")
+
+        use_m1_exit = m1 is not None and len(m1) > 0
+        if use_m1_exit:
+            m1 = m1.sort_values("time").reset_index(drop=True)
+            t0, t1 = m15["time"].min(), m15["time"].max()
+            m1 = m1[(m1["time"] >= t0) & (m1["time"] <= t1)].reset_index(drop=True)
+            if len(m1) < 10:
+                logger.warning("M1 sau khi cắt theo M15 quá ngắn — tắt exit M1, dùng M15")
+                use_m1_exit = False
+        max_m1_bars = max(1, max_m15_bars_for_exit * 15)
 
         frames = build_multi_timeframe(m15)
         m15 = frames["M15"]
@@ -142,7 +210,16 @@ class BacktestEngine:
             sl = float(sig.stop_loss)
             tp = float(sig.take_profit_1)
 
-            outcome, exit_j, exit_px = _simulate_exit(m15, i + 1, direction, entry, sl, tp)
+            if use_m1_exit:
+                outcome, exit_t_dt, exit_px = _simulate_exit_m1(
+                    m1, t, direction, entry, sl, tp, max_m1_bars=max_m1_bars
+                )
+                exit_j = _m15_bar_index_for_ts(m15, exit_t_dt)
+            else:
+                outcome, exit_j, exit_px = _simulate_exit(
+                    m15, i + 1, direction, entry, sl, tp, max_bars=max_m15_bars_for_exit
+                )
+                exit_t_dt = _ensure_utc(pd.Timestamp(m15.iloc[exit_j]["time"]).to_pydatetime())
 
             risk = equity * self._risk_pct
             sl_dist = abs(entry - sl)
@@ -158,7 +235,7 @@ class BacktestEngine:
                 move = (exit_px - entry) if direction == "BUY" else (entry - exit_px)
                 pnl_gross = risk * (move / sl_dist) if sl_dist else 0.0
 
-            exit_t = _ensure_utc(pd.Timestamp(m15.iloc[exit_j]["time"]).to_pydatetime())
+            exit_t = exit_t_dt
 
             cost_usd = 0.0
             spec = self._symbols_specs.get(symbol.upper(), {})
@@ -252,6 +329,7 @@ class BacktestEngine:
             losses=len(losses),
             total_transaction_costs_usd=total_costs_usd,
             costs_enabled=self._costs_enabled,
+            m1_resolution_for_exit=bool(use_m1_exit),
         )
 
         ok, reason = check_ftmo_compliance(result, initial_balance)

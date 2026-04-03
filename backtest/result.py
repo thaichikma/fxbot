@@ -52,3 +52,4 @@ class BacktestResult:
     challenge: dict[str, Any] = field(default_factory=dict)
     total_transaction_costs_usd: float = 0.0
     costs_enabled: bool = False
+    m1_resolution_for_exit: bool = False  # True nếu SL/TP được đánh giá trên M1

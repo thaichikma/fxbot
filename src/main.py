@@ -24,6 +24,8 @@ from src.risk.daily_tracker import DailyTracker
 from src.risk.ftmo_guardian import FTMOGuardian, GuardianConfig
 from src.risk.risk_manager import RiskManager
 from src.strategy.news_filter import NewsFilter
+from src.strategy.h1_m5_engine import H1M5Engine
+from src.strategy.ml_engine import MLEngine
 from src.strategy.scanner import SignalScanner
 from src.strategy.session_filter import SessionFilter
 from src.strategy.smc_engine import SMCEngine
@@ -155,12 +157,16 @@ async def main():
     session_filter = SessionFilter(settings.get("sessions", {}))
     news_filter = NewsFilter(settings.get("news", {}))
     smc_engine = SMCEngine(strategy_merged, symbols_specs)
+    h1_m5_engine = H1M5Engine(strategy_merged, symbols_specs)
+    ml_engine = MLEngine(settings, symbols_specs)
     signal_scanner = SignalScanner(
         settings,
         symbols_specs,
         session_filter,
         news_filter,
         smc_engine,
+        h1_m5_engine=h1_m5_engine,
+        ml_engine=ml_engine,
     )
 
     trading_state = TradingState.from_settings(system_cfg)

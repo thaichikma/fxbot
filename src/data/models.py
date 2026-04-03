@@ -32,6 +32,8 @@ class SignalType(str, Enum):
     FVG_FILL = "FVG_FILL"
     LIQUIDITY_SWEEP = "LIQUIDITY_SWEEP"
     BOS_CONTINUATION = "BOS_CONTINUATION"
+    H1_M5_FVG = "H1_M5_FVG"
+    ML_PREDICTION = "ML_PREDICTION"
 
 
 class SignalStatus(str, Enum):

@@ -11,6 +11,8 @@ from loguru import logger
 
 from src.data.db import Database
 from src.data.models import Signal
+from src.strategy.h1_m5_engine import H1M5Engine
+from src.strategy.ml_engine import MLEngine
 from src.strategy.news_filter import NewsFilter
 from src.strategy.session_filter import SessionFilter
 from src.strategy.smc_engine import SMCEngine
@@ -50,12 +52,16 @@ class SignalScanner:
         session_filter: SessionFilter,
         news_filter: NewsFilter,
         smc_engine: SMCEngine,
+        h1_m5_engine: H1M5Engine | None = None,
+        ml_engine: MLEngine | None = None,
     ):
         self._settings = settings
         self._symbol_specs = symbol_specs
         self._session = session_filter
         self._news = news_filter
-        self._engine = smc_engine
+        self._smc = smc_engine
+        self._h1_m5 = h1_m5_engine
+        self._ml = ml_engine
 
     def _price_epsilon(self, symbol: str) -> float:
         spec = self._symbol_specs.get(symbol.upper(), {})
@@ -85,22 +91,50 @@ class SignalScanner:
             if not pair.get("enabled", True):
                 continue
             symbol = pair["symbol"]
+            profile = str(pair.get("strategy", "smc")).strip().lower()
             tf = pair.get("timeframes", {})
             bias_tf = tf.get("bias", "H4")
             structure_tf = tf.get("structure", "H1")
             entry_tf = tf.get("entry", "M15")
 
-            h4 = mt5_client.get_rates(symbol, bias_tf, 200)
-            h1 = mt5_client.get_rates(symbol, structure_tf, 500)
-            m15 = mt5_client.get_rates(symbol, entry_tf, 500)
-            if h4 is None or h1 is None or m15 is None:
-                logger.debug("No rates for {} — skip", symbol)
-                continue
-            if getattr(h4, "empty", False) or getattr(h1, "empty", False) or getattr(m15, "empty", False):
-                continue
+            if profile == "h1_m5":
+                if self._h1_m5 is None:
+                    logger.warning("Pair {} uses h1_m5 but H1M5Engine not configured — skip", symbol)
+                    continue
+                h1_bars = int(pair.get("h1_bars", 500))
+                m5_bars = int(pair.get("m5_bars", 1000))
+                h1 = mt5_client.get_rates(symbol, "H1", h1_bars)
+                m5 = mt5_client.get_rates(symbol, "M5", m5_bars)
+                if h1 is None or m5 is None:
+                    logger.debug("No H1/M5 rates for {} — skip", symbol)
+                    continue
+                if getattr(h1, "empty", False) or getattr(m5, "empty", False):
+                    continue
+                data = {"H1": h1, "M5": m5}
+                signals = self._h1_m5.analyze(symbol, data)
+            elif profile == "ml":
+                if self._ml is None:
+                    logger.warning("Pair {} uses ml but MLEngine not configured — skip", symbol)
+                    continue
+                ml_bars = int(pair.get("ml_ohlc_bars", 500))
+                m15 = mt5_client.get_rates(symbol, entry_tf, ml_bars)
+                if m15 is None or getattr(m15, "empty", False):
+                    continue
+                key = str(self._settings.get("ml", {}).get("entry_timeframe_key", "M15"))
+                data = {key: m15, "M15": m15}
+                signals = self._ml.analyze(symbol, data)
+            else:
+                h4 = mt5_client.get_rates(symbol, bias_tf, 200)
+                h1 = mt5_client.get_rates(symbol, structure_tf, 500)
+                m15 = mt5_client.get_rates(symbol, entry_tf, 500)
+                if h4 is None or h1 is None or m15 is None:
+                    logger.debug("No rates for {} — skip", symbol)
+                    continue
+                if getattr(h4, "empty", False) or getattr(h1, "empty", False) or getattr(m15, "empty", False):
+                    continue
 
-            data = {"H4": h4, "H1": h1, "M15": m15}
-            signals = self._engine.analyze(symbol, data)
+                data = {"H4": h4, "H1": h1, "M15": m15}
+                signals = self._smc.analyze(symbol, data)
 
             for sig in signals:
                 active, sess_name = self._session.is_trading_session(now)

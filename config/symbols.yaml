@@ -49,6 +49,28 @@ symbols:
     typical_spread_points: 12
     margin_rate: 0.0333
 
+  BTCUSD:
+    description: "Bitcoin vs US Dollar (CFD — verify broker contract)"
+    contract_size: 1
+    pip_size: 0.01                # 1 pip = $0.01 price move (broker-specific)
+    pip_value_per_lot: 1.0        # ~$1 per pip per 1.0 lot (verify)
+    point_size: 0.01
+    digits: 2
+    currency_profit: "USD"
+    typical_spread_points: 50
+    margin_rate: 0.10
+
+  ETHUSD:
+    description: "Ethereum vs US Dollar (CFD — verify broker contract)"
+    contract_size: 1
+    pip_size: 0.01
+    pip_value_per_lot: 0.10      # verify on MT5 spec
+    point_size: 0.01
+    digits: 2
+    currency_profit: "USD"
+    typical_spread_points: 30
+    margin_rate: 0.10
+
 # Correlation groups (for exposure management)
 # EURUSD/GBPUSD: USD quote; USDJPY: USD base — RiskManager counts same-direction exposure in usd_pairs.
 correlation_groups:
@@ -59,3 +81,6 @@ correlation_groups:
     - "XAUUSD"
   gold_usd:
     - "XAUUSD"
+  crypto_usd:
+    - "BTCUSD"
+    - "ETHUSD"

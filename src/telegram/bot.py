@@ -36,7 +36,9 @@ Cách dùng nhanh:
 
 Nếu bật backtest.auto_fetch_mt5 và terminal MT5 đã kết nối, bot sẽ tự tải nến thiếu trước khi backtest.
 Nếu không dùng MT5, copy CSV vào repo (ví dụ data/backtest/xau.csv). Có sẵn: data/backtest/sample_m15.csv.
-Đường dẫn tương đối từ thư mục gốc project. Dùng / hoặc \\ trên Windows."""
+Đường dẫn tương đối từ thư mục gốc project. Dùng / hoặc \\ trên Windows.
+
+Tùy chọn: backtest.m1_csv — nếu trỏ tới file M1 hợp lệ, backtest đánh giá đường đi SL/TP trên M1 (tín hiệu entry SMC vẫn trên M15)."""
 
 
 def _resolve_csv_path(root: Path, csv_arg: str) -> Path:
@@ -456,6 +458,9 @@ class TelegramBot:
         auto_fetch = _yaml_bool(bt.get("auto_fetch_mt5"), True)
         fetch_bars = int(bt.get("mt5_fetch_bars", 8000))
         auto_pattern = str(bt.get("auto_csv_pattern", "data/backtest/{symbol}_m15.csv"))
+        m1_csv_cfg = str(bt.get("m1_csv", "") or "").strip()
+        m1_path_resolved = (root / m1_csv_cfg).resolve() if m1_csv_cfg else None
+        m1_file_ok = bool(m1_path_resolved and m1_path_resolved.is_file())
 
         raw_args = context.args or []
         args = [a.strip() for a in raw_args if a.strip()]
@@ -477,6 +482,7 @@ class TelegramBot:
                     f"• đường dẫn đầy đủ:\n{line_path}\n"
                     f"• auto_fetch_mt5: {'bật' if auto_fetch else 'tắt'} | MT5 kết nối: {'có' if mt5_ok else 'không'}\n"
                     f"• mt5_fetch_bars / auto_csv_pattern: {fetch_bars} / {auto_pattern}\n"
+                    f"• m1_csv: {m1_csv_cfg or '(trống)'} — file: {'có' if m1_file_ok else 'không'}\n"
                     f"• balance/step/min_bars: {default_balance} / {step} / {min_bars}",
                 )
                 return
