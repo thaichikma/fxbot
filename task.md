@@ -21,7 +21,8 @@
 - [x] SMC Engine (FVG + bias; pandas — không dùng smartmoneyconcepts)
 - [x] Session Filter
 - [x] News Filter (Finnhub + cache)
-- [x] Signal Scanner (multi-pair)
+- [x] Signal Scanner (multi-pair; profiles `smc` / `h1_m5` / `ml`)
+- [x] H1M5Engine, MLEngine + wiring `main.py`
 - [x] Tests (session, news, smc, scanner) + main wiring (notify only)
 
 ## Phase 3: Execution & Risk (Week 5-6)
@@ -33,10 +34,12 @@
 - [x] Tests: `test_risk_manager.py` + guardian fix (`_opens_today`)
 
 ## Phase 4: Backtesting & Validation (Week 7-8)
-- [x] Backtest engine (`backtest/engine.py` — walk-forward M15, SMC, fill model)
+- [x] Backtest engine (`backtest/engine.py` — walk-forward M15, SMC, fill model; optional M1 exit)
 - [x] Performance reporter (`backtest/reporter.py`)
 - [x] FTMO metrics + challenge hints (`backtest/ftmo_challenge.py`)
 - [x] Paper trading checklist (`backtest/paper.py`) + CLI `python -m backtest --csv ...`
+- [x] SQLite `ohlc_bars` + `MTFOHLCStore` + `scripts/mtf_import_csv.py` (CSV XAU → DB)
+- [x] Tests trên CSV thật / DB (`tests/test_real_data_csv.py`, `test_real_data_from_db.py`)
 
 ## Phase 5: Deployment (Week 9+)
 - [x] Windows VPS setup (hướng dẫn + script PowerShell: `docs/deployment.md`, `scripts/windows/`)
@@ -44,7 +47,8 @@
 - [x] Go live (checklist §7; thực hiện thủ công trên tài khoản FTMO)
 
 ## Phase 6: ML/AI Layer (Month 3-4)
-- [ ] Data collection pipeline
-- [ ] Feature engineering
-- [ ] Model training
-- [ ] A/B testing
+- [x] Feature engineering (RSI, ATR, volume — `src/ml/features.py`, `indicators.py`)
+- [x] Model training scripts (XGBoost / LSTM — `scripts/ml_train.py`, `requirements-ml.txt`)
+- [x] `MLEngine` + pair `strategy: ml` + `settings.ml` (model path, threshold)
+- [ ] Data collection pipeline (tự động từ MT5 → DB theo lịch)
+- [ ] A/B testing / live shadow mode

@@ -1,21 +1,32 @@
 # Codebase Summary
 
-The FXBot project utilizes a Modular Monolith architecture built strictly on Python 3.11+. The project leans on heavily decoupling State tracking, Market API hooking, and Strategy computation.
+FXBot is a **Python 3.11+** modular monolith: MT5 integration, SQLite state, SMC/strategy engines, backtest, and optional ML.
 
 ## Directory Structure
-- `/config/`: Master settings, symbols mapping, and absolute FTMO invariant rules (`.yaml`).
-- `/src/core/`: Interfaces with MT5 environments. Houses `mt5_client.py` for live Windows MT5 and `mt5_mock.py` for synthetic MAC testing.
-- `/src/data/`: `aiosqlite` abstraction layers alongside strict Pydantic schemas validating Trade, Signal, and Account states.
-- `/src/risk/`: Capital protection layers, critically housing `ftmo_guardian.py` (Rule enforcer) and `daily_tracker.py`.
-- `/src/strategy/`: Price action computation parsing dataframes via the `smartmoneyconcepts` library into viable setup signals. Includes time-window session scoping.
-- `/src/telegram/`: Telemetry API hook linking bot actions to Telegram slash commands `/status`, `/ftmo`, etc.
-- `/src/utils/`: Timezone normalization tools forcing data into UTC/CEST formats alongside mathematically precise position pip/lot calculators.
-- `/tests/`: `pytest` suites validating rule boundaries (Currently 100% test coverage on `FTMOGuardian`).
-- `/backtest/`: Scaffolding for processing historical dataset validations.
+
+| Path | Role |
+|------|------|
+| `config/` | `settings.yaml`, `symbols.yaml`, `ftmo_rules.yaml` |
+| `src/core/` | `mt5_client.py` (Windows), `mt5_mock.py` (non-Windows dev) |
+| `src/data/` | `db.py` (async SQLite: trades, signals, daily_pnl, **ohlc_bars**), `mtf_store.py`, `mtf_schema.py`, `mtf_csv_import.py`, models |
+| `src/risk/` | `ftmo_guardian.py`, `daily_tracker.py`, `risk_manager.py` |
+| `src/strategy/` | `smc_engine.py` (pandas SMC), `h1_m5_engine.py`, `ml_engine.py`, `scanner.py`, session/news filters |
+| `src/ml/` | Indicators (RSI, ATR), features, XGBoost/LSTM helpers (optional deps) |
+| `src/telegram/` | Telegram bot commands |
+| `src/utils/` | Logger, timezone, calculators |
+| `backtest/` | Engine, reporter, costs, data loader, MTF simulation helpers, metrics |
+| `scripts/` | `mtf_import_csv.py`, `ml_train.py`, `xau_data_info.py`, `ftmo_challenge_sim.py`, etc. |
+| `tests/` | pytest (guardian, risk, SMC, scanner, backtest, MTF store, real CSV/DB) |
+| `docs/` | Architecture and deployment notes |
 
 ## Core Dependencies
-- `MetaTrader5`: Data pulling and command forwarding on Windows instances.
-- `smartmoneyconcepts`: Baseline for technical analysis identification (SMC).
-- `pydantic` & `aiosqlite`: Data representation and async I/O writing.
-- `loguru`: Prettified logging.
-- `python-telegram-bot`: Command line telemetry via standard chat interactions.
+
+- **MetaTrader5** (Windows only, in `requirements.txt`)
+- **pandas / numpy** — OHLC and SMC logic (no `smartmoneyconcepts` library in repo)
+- **pydantic** & **aiosqlite** — models and async DB
+- **loguru**, **python-telegram-bot**, **pyyaml**, **python-dotenv**
+- **Optional ML:** `requirements-ml.txt` — `xgboost`, `torch`
+
+## Strategy Note
+
+SMC signals are implemented in **`src/strategy/smc_engine.py`** using pandas (FVG, bias, structure), not a third-party SMC package.

@@ -9,10 +9,8 @@ The immediate goal focuses on generating a reliable trading bot structure adheri
 - Telegram Control Shell and Monitoring Tracking Base
 
 ## Phase 2: Strategy Core (Completed)
-- Implementing `smartmoneyconcepts` library mapping
-- Market structural tracking (Bos, CHoCH, Fair value gaps, Order block recognition)
-- Implementing News Api and Time/Session scheduling 
-- Broad Signal filtering Scanner implementations
+- SMC engine in pandas (`smc_engine.py` — bias, structure, FVG); optional **H1/M5** and **ML** profiles
+- News API + session scheduling; multi-pair scanner (`strategy: smc | h1_m5 | ml`)
 
 ## Phase 3: Execution & Risk (Completed)
 - Advanced Scaling (Fractional closures triggering SL-Breakeven adjustments)
@@ -20,16 +18,14 @@ The immediate goal focuses on generating a reliable trading bot structure adheri
 - Deep Configuration implementations (Correlation mapping and limits)
 
 ## Phase 4: Backtesting & Validation (Completed)
-- Simulating raw historical data processing 
-- Comprehensive paper environment runs simulating 1:1 true limit Challenge configurations
+- Historical CSV + optional **M1 exit** resolution; costs model; **MTF SQLite** import (`mtf_import_csv.py`)
+- Paper checklist + CLI/Telegram backtest; tests on real CSV / DB
 
 ## Phase 5: FTMO Demo to Live Sandbox (Completed)
 - Windows VPS provisioning và vận hành (xem [`deployment.md`](deployment.md))
 - Deploy tới FTMO Demo / Free Trial; xác minh Guardian và MetriX
 - Checklist go-live challenge trả phí
 
-## Phase 6/7: ML Signal Quality Evaluation Pipeline (Pending)
-- Extracting historical signals out of SQLite tracking and processing post-event profitability analysis.
-- Feature mapping correlations of standard SMC events vs broader market momentum matrices.
-- Processing XGBoost / LightGBMs models to output a `Quality 0-100% rating`. 
-- Gating active configurations to strictly accept higher modeled setups above generic bounds metrics bounds thresholds. 
+## Phase 6/7: ML Signal Quality Evaluation (In progress)
+- **Done:** RSI/ATR/volume features (`src/ml/`), `scripts/ml_train.py` (XGBoost / LSTM), `MLEngine` + `settings.ml`
+- **Pending:** automated signal extraction from DB for post-labeling; LightGBM / ensemble; explicit quality score 0–100 gating beyond current probability threshold 

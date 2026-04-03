@@ -1,53 +1,95 @@
 # FXBot - FTMO MT5 Trading System
 
-FXBot is an automated MT5 trading bot specifically designed for FTMO prop firm challenges ($10k 2-Phase Swing). It leverages Smart Money Concepts (SMC) to detect high-probability market setups alongside strict "Guardian"-level risk limits explicitly matching FTMO's parameters.
+FXBot is an automated MT5 trading bot for FTMO-style prop challenges. It uses **Smart Money Concepts (SMC)** and optional **H1/M5 trend + FVG**, **ML scoring (XGBoost/LSTM)**, and strict **FTMO Guardian** risk limits.
 
 ## Key Features
-- **SMC Strategy Core**: Automated detection of Order Blocks, FVGs, BOS/CHoCH structures, and Liquidity Sweeps on multi-timeframes.
-- **FTMO Guardian**: Real-time Kill Switch to avoid Daily Loss (5%), Overall Drawdown (10%), and Hyperactivity violations. Features safety buffers to intervene before FTMO strikes.
-- **Session & News Filtering**: Only hunts setups inside high-probability windows (e.g. London & NY overlap) avoiding major red-folder news.
-- **Hybrid Execution**: "Auto Mode" via VPS during prime windows and "Signal Mode" for low-quality alerts sent through a Telegram bot shell.
+
+- **Strategy profiles** (per pair in `config/settings.yaml` → `strategy:`):
+  - **`smc`** (default): H4 bias, H1 structure, M15 FVG — `SMCEngine`.
+  - **`h1_m5`**: H1 EMA trend, M5 FVG — `H1M5Engine` (e.g. crypto).
+  - **`ml`**: optional XGBoost model from `ml.model_path` — `MLEngine`.
+- **FTMO Guardian**: kill switch for daily loss, overall drawdown, hyperactivity; safety buffers.
+- **Session & news filtering**: London/NY windows; optional Finnhub calendar blocking.
+- **Hybrid execution**: auto mode during allowed sessions vs signal-only via Telegram.
+- **Portfolio**: forex, XAU, optional **BTCUSD / ETHUSD** (`symbols.yaml`; pairs `enabled: false` until your broker offers symbols).
 
 ## Documentation
-- [Kiến trúc giả lập trading — data / strategy / backtest / metrics](docs/simulation-architecture.md)
-- [Project Overview & PDR](docs/project-overview-pdr.md)
-- [System Architecture](docs/system-architecture.md)
-- [Codebase Summary](docs/codebase-summary.md)
-- [Code Standards](docs/code-standards.md)
-- [Project Roadmap](docs/project-roadmap.md)
-- [Deployment (Windows VPS + FTMO)](docs/deployment.md)
 
-## Development Setup (MacOS)
+| Doc | Content |
+|-----|---------|
+| [simulation-architecture.md](docs/simulation-architecture.md) | Data, strategies, backtest resolution, metrics, pitfalls |
+| [deployment.md](docs/deployment.md) | Windows VPS, MT5, FTMO, go-live |
+| [project-overview-pdr.md](docs/project-overview-pdr.md) | PDR |
+| [system-architecture.md](docs/system-architecture.md) | System view |
+| [codebase-summary.md](docs/codebase-summary.md) | Repo layout |
+| [code-standards.md](docs/code-standards.md) | Conventions |
+| [project-roadmap.md](docs/project-roadmap.md) | Roadmap |
+| [scripts/windows/README.md](scripts/windows/README.md) | Windows scripts |
+
+## Development Setup (macOS / Linux)
+
 ```bash
-# Setup uv venv
 uv venv
-source .venv/bin/activate
+source .venv/bin/activate   # or: .venv\Scripts\activate on Windows
 uv pip install -r requirements-dev.txt
 
-# Run Tests
+# Optional ML training (XGBoost + PyTorch)
+uv pip install -r requirements-ml.txt
+
 pytest tests/
 ```
 
+### Tests using your CSV / database
+
+- **CSV**: `tests/test_real_data_csv.py` — reads `data/XAU_*_data.csv`, `data/backtest/sample_m15.csv`. Env: `FXBOT_TEST_MAX_BARS`, `FXBOT_TEST_CSV`, `FXBOT_TEST_SYMBOL`.
+- **SQLite `ohlc_bars`**: `tests/test_real_data_from_db.py` — imports CSVs into a temp DB then runs backtest / ML features from `MTFOHLCStore`. Env: `FXBOT_TEST_DB_MAX_ROWS`, `FXBOT_TEST_SKIP_DB_IMPORT=1` to skip.
+
 ## Production Deployment
-Chạy trên **Windows VPS** với MT5 Terminal và biến môi trường trong `.env`. Chi tiết: [docs/deployment.md](docs/deployment.md) và [scripts/windows/README.md](scripts/windows/README.md).
 
-## Telegram — backtest
-- `/backtest` hoặc `/bt`: chạy backtest với CSV mặc định (`backtest.default_csv` trong `config/settings.yaml`; repo có `data/backtest/sample_m15.csv`).
-- `/backtest help` — hướng dẫn; `/backtest status` — kiểm tra symbol và file mặc định.
+Run on **Windows VPS** with MT5 terminal and `.env`. See [docs/deployment.md](docs/deployment.md) and [scripts/windows/README.md](scripts/windows/README.md).
 
-## Backtest — phí giao dịch (xấp xỉ)
-- `backtest.costs`: spread (`symbols.yaml`), commission RT/lot (mặc định ~**$5**/lot forex theo thông tin FTMO kiểu ECN), swap đêm (mặc định long/short âm vài USD/lot — **ước lượng**). **Không** thay tick thật; vàng/CFD cần chỉnh tay (FTMO có thể tính %).
+## Telegram
 
-## Database — OHLC đa khung (MTF) & giả lập
+- `/backtest`, `/bt`: backtest default CSV (`backtest.default_csv` in `settings.yaml`; sample: `data/backtest/sample_m15.csv`).
+- `/backtest help`, `/backtest status` — help and config (includes `m1_csv` if set).
+- Other commands: `/auto`, `/exec`, `/risk`, `/trades`, `/session`, `/config`, `/challenge` — see bot help.
 
-- Bảng `ohlc_bars` (symbol, tf, ts, OHLC, volume): lưu nhiều khung (M1…MN1) để đánh giá trend / walk-forward không chỉ resample từ M15.
-- Bảng `simulation_runs` / `simulation_steps`: ghi equity + `metrics_json` theo từng nến (tham số tùy chỉnh: ADX, bias, …).
-- Schema được tạo cùng `data/fxbot.db` khi bot khởi động; có thể dùng đồng bộ qua `MTFOHLCStore`.
-- Nạp CSV: `PYTHONPATH=. uv run python scripts/mtf_import_csv.py --symbol XAUUSD --all-xau` (hoặc liệt kê file; `--max-rows` để giới hạn).
+## Backtest CLI
 
-## Backtest — XAUUSD (CSV MT4 trong `data/`)
-- Định dạng: `Date;Open;High;Low;Close;Volume` (dấu `;`, ngày kiểu `YYYY.MM.DD HH:MM`). Loader đọc tự động.
-- **Chỉ cần M15** cho `python -m backtest`: H1/H4 được tạo từ M15 trong engine. Các file 1h, 4h, 1d, … phục vụ phân tích / đối chiếu, không nạp song song vào backtest hiện tại.
-- Ví dụ (giới hạn số nến cho tốc độ):  
-  `PYTHONPATH=. python -m backtest --symbol XAUUSD --csv data/XAU_15m_data.csv --max-bars 50000 --from-date 2024-01-01 --step 4`
-- Thống kê nhanh các file `XAU_*.csv`: `PYTHONPATH=. python scripts/xau_data_info.py`
+```text
+python -m backtest --symbol XAUUSD --csv data/XAU_15m_data.csv [--m1-csv data/XAU_1m_data.csv] [--max-m15-exit 96] [--from-date YYYY-MM-DD] [--to-date ...] [--max-bars N] [--step 4]
+```
+
+- **Entry**: SMC on **M15** (H1/H4 resampled inside engine from M15).
+- **Exit**: if `--m1-csv` or `backtest.m1_csv` points to a valid M1 CSV (aligned in time with M15), SL/TP path is simulated on **M1**; otherwise on M15.
+- **Costs**: `backtest.costs` — spread from `symbols.yaml`, commission RT/lot, overnight swap (approximate; tune for XAU/CFD).
+
+## Data: CSV → SQLite (MTF)
+
+- Table **`ohlc_bars`**: `(symbol, tf, ts, OHLC, volume, source)` — M1 … MN1.
+- **Import** (development / analysis):
+
+  ```bash
+  PYTHONPATH=. python scripts/mtf_import_csv.py --db data/fxbot.db --symbol XAUUSD --all-xau --replace
+  PYTHONPATH=. python scripts/mtf_import_csv.py --db data/fxbot.db data/XAU_15m_data.csv --max-rows 100000
+  ```
+
+- TF is inferred from filename (`XAU_15m_data.csv` → M15). Longest suffix wins so **`15m` is not mistaken for `5m`**.
+- **Info script**: `PYTHONPATH=. python scripts/xau_data_info.py`
+
+## Machine learning (optional)
+
+- **Features**: RSI, ATR, volume (log) — `src/ml/features.py`, `src/ml/indicators.py`.
+- **Train**:
+
+  ```bash
+  PYTHONPATH=. python scripts/ml_train.py --csv data/backtest/sample_m15.csv --model xgb --out models/xgb.pkl
+  PYTHONPATH=. python scripts/ml_train.py --csv path/to/m15.csv --model lstm --out models/lstm.pt
+  ```
+
+- Enable in **`settings.yaml`** → `ml:` (`enabled`, `model_path`, `prob_threshold`, …) and set a pair to `strategy: ml`.
+
+## XAU CSV (MT4-style)
+
+- Format: `Date;Open;High;Low;Close;Volume` — semicolon, date `YYYY.MM.DD HH:MM`. Loader auto-detects.
+- Large files can be sliced with `--max-bars` / backtest `--max-bars`.
